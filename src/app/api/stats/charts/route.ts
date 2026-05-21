@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase';
 
 const ANNUAL_BUDGET = 80_000_000; // 연간 예산 8천만원
 
 export async function GET() {
   try {
-    await requireAuth();
     const sb = createServerClient();
 
     const thisYear = new Date().getFullYear();

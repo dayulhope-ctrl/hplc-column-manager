@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase';
 
 export async function GET(req: Request) {
   try {
-    await requireAuth();
     const { searchParams } = new URL(req.url);
     const month = searchParams.get('month'); // YYYY-MM
     const from = searchParams.get('from');

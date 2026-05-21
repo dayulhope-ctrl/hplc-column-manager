@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, requireAdmin } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase';
 
-// 칼럼 목록 조회 (팀원/관리자 모두 가능)
+// 칼럼 목록 조회 (게스트/팀원/관리자 모두 가능)
 export async function GET(req: NextRequest) {
   try {
-    await requireAuth();
     
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';

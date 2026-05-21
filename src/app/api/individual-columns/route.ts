@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin, requireAuth } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase';
 
 export async function GET(req: NextRequest) {
   try {
-    await requireAuth();
     const sb = createServerClient();
     const { searchParams } = new URL(req.url);
     const modelId = searchParams.get('model_id');

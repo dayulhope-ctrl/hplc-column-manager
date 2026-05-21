@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    await requireAuth();
     const sb = createServerClient();
 
     const { data: columns, error } = await sb.from('column_models').select('*');

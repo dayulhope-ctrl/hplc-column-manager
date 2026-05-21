@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase';
 
-// 구매 요청 목록 (전체 - 모두 조회 가능)
+// 구매 요청 목록 (게스트/팀원/관리자 모두 조회 가능)
 export async function GET(req: NextRequest) {
   try {
-    await requireAuth();
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status'); // pending, approved, all
     
@@ -32,10 +31,10 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// 구매 요청 생성 (팀원/관리자)
+// 구매 요청 생성 (게스트/팀원/관리자)
 export async function POST(req: NextRequest) {
   try {
-    const session = await requireAuth();
+    const session = await getSession(); // null이면 게스트
     const body = await req.json();
 
     const sb = createServerClient();
@@ -74,13 +73,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '필수 항목이 누락되었습니다 (칼럼 또는 수량)' }, { status: 400 });
     }
 
-    // 요청자: 폼에서 지정한 값 우선, 없으면 세션 기반
-    const sessionName = session.type === 'admin'
-      ? (session as any).username
-      : (session as any).user_name;
-    const requestedBy = body.requester_name?.trim() || sessionName;
+    // 요청자: 폼에서 지정한 값 우선, 없으면 세션 기반, 그것도 없으면 '익명'
+    const sessionName = session
+      ? (session.type === 'admin' ? (session as any).username : (session as any).user_name)
+      : null;
+    const requestedBy = body.requester_name?.trim() || sessionName || '익명';
 
-    const department = session.type === 'user'
+    const department = session?.type === 'user'
       ? (session as any).department
       : null;
 
@@ -102,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     await sb.from('activity_logs').insert({
       actor: requestedBy,
-      actor_type: session.type,
+      actor_type: session?.type ?? 'guest',
       action: 'create_purchase_request',
       target_type: 'purchase_request',
       target_id: data.id,
