@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Package, FlaskConical, ShoppingCart, CheckCircle, Activity, Search,
   ClipboardList, Plus, Bell, Calendar, Edit, X,
-  History, BarChart2, Download, FileText, Trash2,
+  History, BarChart2, FileText, Download,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
@@ -18,6 +18,8 @@ import ClosingDataTab from '@/components/ClosingDataTab';
 import PurchaseHistoryTab from '@/components/PurchaseHistoryTab';
 import ColumnDetailDialog from '@/components/ColumnDetailDialog';
 import PurchaseRequestAddDialog from '@/components/PurchaseRequestAddDialog';
+import RequestsPanel from '@/components/RequestsPanel';
+import ReceivingsPanel from '@/components/ReceivingsPanel';
 import { ColumnModel, DashboardStats, PurchaseRequest, ReceivingRecord, MonthlyClosing } from '@/types';
 
 interface Props {
@@ -268,12 +270,12 @@ export default function AdminClient({ adminName, username }: Props) {
 
         {/* 구매 요청 관리 */}
         {tab === 'requests' && (
-          <RequestsPanel requests={requests} onAction={handleRequestAction} onRefresh={fetchData} adminName={adminName || username} />
+          <RequestsPanel requests={requests} onAction={handleRequestAction} onRefresh={fetchData} adminName={adminName || username} isAdmin />
         )}
 
         {/* 입고 확인 */}
         {tab === 'receiving' && (
-          <ReceivingsPanel receivings={receivings} closings={closings} onRefresh={fetchData} />
+          <ReceivingsPanel receivings={receivings} closings={closings} onRefresh={fetchData} isAdmin />
         )}
 
         {/* 마감자료 */}
@@ -312,265 +314,6 @@ export default function AdminClient({ adminName, username }: Props) {
           onSaved={() => { setShowAddColumn(false); fetchData(); setMessage({ type: 'success', text: '칼럼이 추가되었습니다' }); }}
         />
       )}
-    </div>
-  );
-}
-
-// ============================
-// 구매 요청 관리 패널
-// ============================
-function RequestsPanel({
-  requests, onAction, onRefresh, adminName,
-}: {
-  requests: PurchaseRequest[];
-  onAction: (id: string, action: any, notes?: string) => Promise<void>;
-  onRefresh: () => void;
-  adminName: string;
-}) {
-  const [showAdd, setShowAdd] = useState(false);
-
-  const active = requests.filter(r => !['received', 'rejected'].includes(r.status));
-  const completed = requests.filter(r => r.status === 'received');
-  const rejected = requests.filter(r => r.status === 'rejected');
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('이 구매 요청을 삭제하시겠습니까?')) return;
-    const res = await fetch(`/api/requests/${id}`, { method: 'DELETE' });
-    if (res.ok) onRefresh();
-  };
-
-  const RequestTable = ({ rows, showActions }: { rows: PurchaseRequest[]; showActions?: boolean }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-xs uppercase text-gray-600">
-            <tr>
-              <th className="px-4 py-3 text-left">요청일</th>
-              <th className="px-4 py-3 text-left">요청자</th>
-              <th className="px-4 py-3 text-left">모델명</th>
-              <th className="px-4 py-3 text-left">Cat. No</th>
-              <th className="px-4 py-3 text-center">수량</th>
-              <th className="px-4 py-3 text-left">요청사유</th>
-              <th className="px-4 py-3 text-center">상태</th>
-              <th className="px-4 py-3 text-center">처리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {rows.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">내역이 없습니다</td></tr>
-            ) : rows.map(req => (
-              <tr key={req.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-gray-600 text-xs">
-                  {new Date(req.created_at).toLocaleDateString('ko-KR')}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900 text-xs">{req.requested_by}</div>
-                  {req.department && <div className="text-xs text-gray-400">{req.department}</div>}
-                </td>
-                <td className="px-4 py-3 font-medium text-gray-900 text-sm">{req.column_models?.model_name}</td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-500">{req.column_models?.cat_no}</td>
-                <td className="px-4 py-3 text-center font-semibold">{req.quantity}</td>
-                <td className="px-4 py-3 text-xs text-gray-600">{req.reason || '-'}</td>
-                <td className="px-4 py-3 text-center"><StatusBadge status={req.status} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                    {showActions && (
-                      <>
-                        {req.status === 'pending' && (
-                          <>
-                            <button onClick={() => onAction(req.id, 'approve')}
-                              className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">승인</button>
-                            <button onClick={() => onAction(req.id, 'reject')}
-                              className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">거부</button>
-                          </>
-                        )}
-                        {req.status === 'approved' && (
-                          <button onClick={() => onAction(req.id, 'order')}
-                            className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700">발주</button>
-                        )}
-                        {req.status === 'ordered' && (
-                          <button onClick={() => onAction(req.id, 'receive')}
-                            className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">입고처리</button>
-                        )}
-                      </>
-                    )}
-                    <button onClick={() => handleDelete(req.id)}
-                      className="p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <ShoppingCart className="w-5 h-5" />
-          구매 요청 관리
-        </h2>
-        <div className="flex items-center gap-2">
-          <a href="/api/export/requests" download
-            className="px-2.5 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-xs">
-            <Download className="w-3.5 h-3.5" /> 엑셀
-          </a>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" /> 구매요청 추가
-          </button>
-        </div>
-      </div>
-
-      {/* 구매 진행 중 */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
-          구매요청 목록 ({active.length})
-        </h3>
-        <RequestTable rows={active} showActions />
-      </div>
-
-      {/* 구매완료 */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-          구매완료 목록 ({completed.length})
-        </h3>
-        <RequestTable rows={completed} />
-      </div>
-
-      {/* 거부됨 (있을 때만 표시) */}
-      {rejected.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-500 mb-2 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-            거부됨 ({rejected.length})
-          </h3>
-          <RequestTable rows={rejected} />
-        </div>
-      )}
-
-      {showAdd && (
-        <PurchaseRequestAddDialog
-          defaultRequester={adminName}
-          onClose={() => setShowAdd(false)}
-          onSaved={() => { setShowAdd(false); onRefresh(); }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ============================
-// 입고 내역 패널
-// ============================
-function ReceivingsPanel({ receivings, closings, onRefresh }: { receivings: ReceivingRecord[]; closings: MonthlyClosing[]; onRefresh: () => void }) {
-  const [showAll, setShowAll] = useState(false);
-
-  // 마감 완료된 월의 Set
-  const closedMonths = new Set(closings.map(c => c.month));
-
-  // 미마감 입고 = 아직 마감처리 안된 월의 입고 기록
-  const unclosed = receivings.filter(r => !closedMonths.has(r.receiving_date.slice(0, 7)));
-  const display = showAll ? receivings : unclosed;
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('이 입고 기록을 삭제하시겠습니까?')) return;
-    const res = await fetch(`/api/receivings/${id}`, { method: 'DELETE' });
-    if (res.ok) onRefresh();
-  };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <CheckCircle className="w-5 h-5" />
-          입고 확인
-          <span className="text-sm font-normal text-gray-500">
-            {showAll ? `전체 ${receivings.length}건` : `미마감 ${unclosed.length}건`}
-          </span>
-        </h2>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showAll}
-              onChange={e => setShowAll(e.target.checked)}
-              className="rounded"
-            />
-            마감 완료 항목 포함
-          </label>
-          <a href="/api/export/receivings" download
-            className="px-2.5 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-xs">
-            <Download className="w-3.5 h-3.5" /> 엑셀
-          </a>
-        </div>
-      </div>
-
-      {!showAll && unclosed.length === 0 && receivings.length > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-3 text-sm text-green-800">
-          모든 입고 기록이 마감 처리되었습니다. "마감 완료 항목 포함"을 체크하면 전체 내역을 볼 수 있습니다.
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-600">
-              <tr>
-                <th className="px-4 py-3 text-left">입고일</th>
-                <th className="px-4 py-3 text-left">모델명</th>
-                <th className="px-4 py-3 text-left">Cat. No</th>
-                <th className="px-4 py-3 text-center">수량</th>
-                <th className="px-4 py-3 text-right">단가</th>
-                <th className="px-4 py-3 text-right">총액</th>
-                <th className="px-4 py-3 text-left">처리자</th>
-                <th className="px-4 py-3 text-center">마감</th>
-                <th className="px-4 py-3 text-center">삭제</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {display.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">입고 내역이 없습니다</td></tr>
-              ) : display.map(rec => {
-                const isClosed = closedMonths.has(rec.receiving_date.slice(0, 7));
-                return (
-                  <tr key={rec.id} className={`hover:bg-gray-50 ${isClosed ? 'opacity-50' : ''}`}>
-                    <td className="px-4 py-3 text-xs">{rec.receiving_date}</td>
-                    <td className="px-4 py-3 font-medium">{rec.model_name}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{rec.cat_no}</td>
-                    <td className="px-4 py-3 text-center font-semibold">{rec.quantity}</td>
-                    <td className="px-4 py-3 text-right">₩{rec.unit_price?.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-semibold">₩{rec.total_price?.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-xs text-gray-600">{rec.received_by}</td>
-                    <td className="px-4 py-3 text-center">
-                      {isClosed
-                        ? <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">마감됨</span>
-                        : <span className="text-xs text-gray-400">-</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => handleDelete(rec.id)}
-                        className="p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

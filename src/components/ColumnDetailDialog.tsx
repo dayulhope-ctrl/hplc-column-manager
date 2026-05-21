@@ -12,6 +12,7 @@ interface Props {
   column: ColumnModel;
   onClose: () => void;
   onStockChanged?: () => void;
+  isAdmin?: boolean;
 }
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
@@ -21,7 +22,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   '입고 예정': { label: '입고 예정', className: 'bg-amber-100 text-amber-800' },
 };
 
-export default function ColumnDetailDialog({ column, onClose, onStockChanged }: Props) {
+export default function ColumnDetailDialog({ column, onClose, onStockChanged, isAdmin = true }: Props) {
   const [records, setRecords] = useState<RecordWithModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [stockDelta, setStockDelta] = useState(0);
@@ -94,24 +95,30 @@ export default function ColumnDetailDialog({ column, onClose, onStockChanged }: 
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-0.5">현재 재고</p>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setStockDelta(d => d - 1)} disabled={currentStock <= 0}
-                  className="w-6 h-6 rounded-full border flex items-center justify-center hover:bg-gray-200 disabled:opacity-30">
-                  <Minus className="w-3 h-3" />
-                </button>
-                <span className={`text-sm font-bold ${stockDelta !== 0 ? 'text-blue-600' : ''}`}>
-                  {currentStock} / {column.total_stock}
-                </span>
-                <button onClick={() => setStockDelta(d => d + 1)}
-                  className="w-6 h-6 rounded-full border flex items-center justify-center hover:bg-gray-200">
-                  <Plus className="w-3 h-3" />
-                </button>
-              </div>
-              {stockDelta !== 0 && (
-                <button onClick={handleStockSave}
-                  className="mt-1 px-2 py-0.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
-                  저장
-                </button>
+              {isAdmin ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setStockDelta(d => d - 1)} disabled={currentStock <= 0}
+                      className="w-6 h-6 rounded-full border flex items-center justify-center hover:bg-gray-200 disabled:opacity-30">
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className={`text-sm font-bold ${stockDelta !== 0 ? 'text-blue-600' : ''}`}>
+                      {currentStock} / {column.total_stock}
+                    </span>
+                    <button onClick={() => setStockDelta(d => d + 1)}
+                      className="w-6 h-6 rounded-full border flex items-center justify-center hover:bg-gray-200">
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                  {stockDelta !== 0 && (
+                    <button onClick={handleStockSave}
+                      className="mt-1 px-2 py-0.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
+                      저장
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm font-bold">{column.total_stock}개</p>
               )}
             </div>
             <div>
@@ -133,17 +140,19 @@ export default function ColumnDetailDialog({ column, onClose, onStockChanged }: 
           </div>
 
           {/* 이력 추가 버튼 */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowAddForm(v => !v)}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm"
-            >
-              <Plus className="w-4 h-4" /> 이력 추가
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAddForm(v => !v)}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm"
+              >
+                <Plus className="w-4 h-4" /> 이력 추가
+              </button>
+            </div>
+          )}
 
           {/* 이력 추가 폼 */}
-          {showAddForm && (
+          {isAdmin && showAddForm && (
             <AddRecordForm
               modelId={column.id}
               onSaved={() => {
@@ -167,14 +176,14 @@ export default function ColumnDetailDialog({ column, onClose, onStockChanged }: 
                   <th className="px-3 py-2 text-left">제품명</th>
                   <th className="px-3 py-2 text-left">시험항목</th>
                   <th className="px-3 py-2 text-left">교체사유</th>
-                  <th className="px-3 py-2 text-center">삭제</th>
+                  {isAdmin && <th className="px-3 py-2 text-center">삭제</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-400">로딩 중...</td></tr>
+                  <tr><td colSpan={isAdmin ? 7 : 6} className="px-3 py-8 text-center text-gray-400">로딩 중...</td></tr>
                 ) : records.length === 0 ? (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-400">사용 이력이 없습니다</td></tr>
+                  <tr><td colSpan={isAdmin ? 7 : 6} className="px-3 py-8 text-center text-gray-400">사용 이력이 없습니다</td></tr>
                 ) : records.map(rec => (
                     <tr key={rec.id} className="hover:bg-gray-50">
                       <td className="px-3 py-2 font-mono text-xs">{rec.column_code || '-'}</td>
@@ -185,15 +194,17 @@ export default function ColumnDetailDialog({ column, onClose, onStockChanged }: 
                       <td className="px-3 py-2 text-xs">{rec.product_name || '-'}</td>
                       <td className="px-3 py-2 text-xs">{rec.test_item || '-'}</td>
                       <td className="px-3 py-2 text-xs text-gray-500">{rec.replacement_reason || '-'}</td>
-                      <td className="px-3 py-2 text-center">
-                        <button
-                          onClick={() => handleDelete(rec.id)}
-                          disabled={deleting === rec.id}
-                          className="p-1 hover:bg-red-50 rounded text-red-500 disabled:opacity-40"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
+                      {isAdmin && (
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => handleDelete(rec.id)}
+                            disabled={deleting === rec.id}
+                            className="p-1 hover:bg-red-50 rounded text-red-500 disabled:opacity-40"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
               </tbody>

@@ -4,7 +4,11 @@ import { useEffect, useState } from 'react';
 import { ClipboardList, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { ReceivingRecord, MonthlyClosing } from '@/types';
 
-export default function PurchaseHistoryTab() {
+interface Props {
+  isAdmin?: boolean;
+}
+
+export default function PurchaseHistoryTab({ isAdmin = true }: Props) {
   const [receivings, setReceivings] = useState<ReceivingRecord[]>([]);
   const [closings, setClosings] = useState<MonthlyClosing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,10 +58,12 @@ export default function PurchaseHistoryTab() {
           <ClipboardList className="w-5 h-5" />
           총 구매내역
         </h2>
-        <a href="/api/export/receivings" download
-          className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1.5 text-sm">
-          <Download className="w-4 h-4" /> 엑셀 다운로드
-        </a>
+        {isAdmin && (
+          <a href="/api/export/receivings" download
+            className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1.5 text-sm">
+            <Download className="w-4 h-4" /> 엑셀 다운로드
+          </a>
+        )}
       </div>
 
       {/* 칼럼별 집계 테이블 */}
@@ -140,16 +146,18 @@ export default function PurchaseHistoryTab() {
                     <span className="text-sm font-bold text-blue-700">
                       마감 합계 ₩{c.total_price?.toLocaleString()}
                     </span>
-                    <div className="flex gap-2">
-                      <a
-                        href={`/api/export/closings?year=${c.month.slice(0, 4)}`}
-                        download
-                        onClick={e => e.stopPropagation()}
-                        className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 flex items-center gap-1"
-                      >
-                        <Download className="w-3 h-3" /> 내보내기
-                      </a>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-2">
+                        <a
+                          href={`/api/export/closings?year=${c.month.slice(0, 4)}`}
+                          download
+                          onClick={e => e.stopPropagation()}
+                          className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 flex items-center gap-1"
+                        >
+                          <Download className="w-3 h-3" /> 내보내기
+                        </a>
+                      </div>
+                    )}
                     {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                   </div>
                 </button>

@@ -1,26 +1,39 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Package, FlaskConical, ShoppingCart, CheckCircle, Activity, Search, ClipboardList, Plus } from 'lucide-react';
+import { Package, FlaskConical, ShoppingCart, CheckCircle, Activity, Search, ClipboardList, Plus, History, BarChart2, FileText } from 'lucide-react';
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
 import ColumnTable from '@/components/ColumnTable';
 import PurchaseRequestDialog from '@/components/PurchaseRequestDialog';
 import PurchaseRequestAddDialog from '@/components/PurchaseRequestAddDialog';
-import { ColumnModel, DashboardStats, PurchaseRequest } from '@/types';
+import MonthlyPurchaseChart from '@/components/charts/MonthlyPurchaseChart';
+import BudgetChart from '@/components/charts/BudgetChart';
+import CartTab from '@/components/CartTab';
+import ClosingDataTab from '@/components/ClosingDataTab';
+import PurchaseHistoryTab from '@/components/PurchaseHistoryTab';
+import IndividualColumnTab from '@/components/IndividualColumnTab';
+import ColumnDetailDialog from '@/components/ColumnDetailDialog';
+import RequestsPanel from '@/components/RequestsPanel';
+import ReceivingsPanel from '@/components/ReceivingsPanel';
+import { ColumnModel, DashboardStats, PurchaseRequest, ReceivingRecord, MonthlyClosing } from '@/types';
 
 interface Props {
   userName: string;
   isAdmin: boolean;
 }
 
-type TabType = 'dashboard' | 'requests';
+type TabType = 'dashboard' | 'requests' | 'cart' | 'receiving' | 'closing_data' | 'purchase_history' | 'columns';
 
 export default function DashboardClient({ userName, isAdmin }: Props) {
   const [tab, setTab] = useState<TabType>('dashboard');
   const [columns, setColumns] = useState<ColumnModel[]>([]);
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [receivings, setReceivings] = useState<ReceivingRecord[]>([]);
+  const [closings, setClosings] = useState<MonthlyClosing[]>([]);
+  const [chartData, setChartData] = useState<any>(null);
+  const [detailColumn, setDetailColumn] = useState<ColumnModel | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
@@ -31,17 +44,21 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [colRes, statsRes, reqRes] = await Promise.all([
+      const [colRes, statsRes, reqRes, recRes, chartRes, closingRes] = await Promise.all([
         fetch('/api/columns'),
         fetch('/api/stats'),
         fetch('/api/requests'),
+        fetch('/api/receivings'),
+        fetch('/api/stats/charts'),
+        fetch('/api/closings'),
       ]);
-      const colData = await colRes.json();
-      const statsData = await statsRes.json();
-      const reqData = await reqRes.json();
-      setColumns(colData.columns || []);
-      setStats(statsData.stats);
-      setRequests(reqData.requests || []);
+      setColumns((await colRes.json()).columns || []);
+      setStats((await statsRes.json()).stats);
+      setRequests((await reqRes.json()).requests || []);
+      setReceivings((await recRes.json()).records || []);
+      const cd = await chartRes.json();
+      setChartData(cd);
+      setClosings((await closingRes.json()).closings || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -108,42 +125,27 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
         )}
 
         {/* 탭 */}
-        <div className="flex items-center justify-between border-b border-gray-200">
-          <div className="flex gap-2">
+        <div className="flex gap-1 sm:gap-2 border-b border-gray-200 overflow-x-auto">
+          {[
+            { key: 'dashboard', label: '대시보드', icon: Package },
+            { key: 'requests', label: '구매요청 내역', icon: ClipboardList },
+            { key: 'cart', label: '장바구니', icon: ShoppingCart },
+            { key: 'receiving', label: '입고 확인', icon: CheckCircle },
+            { key: 'closing_data', label: '마감자료', icon: FileText },
+            { key: 'purchase_history', label: '총 구매내역', icon: BarChart2 },
+            { key: 'columns', label: '칼럼 이력', icon: History },
+          ].map(({ key, label, icon: Icon }) => (
             <button
-              onClick={() => setTab('dashboard')}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                tab === 'dashboard'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              key={key}
+              onClick={() => setTab(key as TabType)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              <Package className="w-4 h-4 inline mr-1.5" />
-              대시보드
+              <Icon className="w-4 h-4" />
+              {label}
             </button>
-            <button
-              onClick={() => setTab('requests')}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                tab === 'requests'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <ClipboardList className="w-4 h-4 inline mr-1.5" />
-              구매요청 내역
-              {requests.filter(r => r.status === 'pending').length > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
-                  {requests.filter(r => r.status === 'pending').length}
-                </span>
-              )}
-            </button>
-          </div>
-          <button
-            onClick={() => setShowAddRequest(true)}
-            className="mb-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" /> 구매요청 추가
-          </button>
+          ))}
         </div>
 
         {/* 대시보드 탭 */}
@@ -184,6 +186,14 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
               </select>
             </div>
 
+            {/* 차트 */}
+            {chartData && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <MonthlyPurchaseChart data={chartData.monthlyData || []} />
+                {chartData.budgetData && <BudgetChart data={chartData.budgetData} />}
+              </div>
+            )}
+
             {/* 칼럼 테이블 */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -199,61 +209,58 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
                 <ColumnTable
                   columns={filteredColumns}
                   onRequestPurchase={setSelectedColumn}
+                  onRowClick={setDetailColumn}
                 />
               )}
             </div>
           </>
         )}
 
-        {/* 요청 내역 탭 */}
+        {/* 구매요청 내역 탭 */}
         {tab === 'requests' && (
-          <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <ClipboardList className="w-5 h-5" />
-              전체 구매 요청 내역
-            </h2>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
-                    <tr>
-                      <th className="px-4 py-3 text-left">요청일</th>
-                      <th className="px-4 py-3 text-left">요청자</th>
-                      <th className="px-4 py-3 text-left">모델명</th>
-                      <th className="px-4 py-3 text-left">Cat. No</th>
-                      <th className="px-4 py-3 text-center">수량</th>
-                      <th className="px-4 py-3 text-left">요청사유</th>
-                      <th className="px-4 py-3 text-center">상태</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {requests.length === 0 ? (
-                      <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">구매 요청 내역이 없습니다</td></tr>
-                    ) : requests.map(req => (
-                      <tr key={req.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-600 text-xs">
-                          {new Date(req.created_at).toLocaleDateString('ko-KR')}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-gray-900 text-xs">{req.requested_by}</div>
-                          {req.department && <div className="text-xs text-gray-400">{req.department}</div>}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-gray-900 text-sm">{req.column_models?.model_name}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-500">{req.column_models?.cat_no}</td>
-                        <td className="px-4 py-3 text-center font-semibold">{req.quantity}</td>
-                        <td className="px-4 py-3 text-xs text-gray-600">{req.reason || '-'}</td>
-                        <td className="px-4 py-3 text-center">
-                          <StatusBadge status={req.status} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <RequestsPanel
+            requests={requests}
+            onAction={async () => {}}
+            onRefresh={fetchData}
+            adminName={userName}
+            isAdmin={false}
+          />
+        )}
+
+        {/* 장바구니 탭 */}
+        <div className={tab !== 'cart' ? 'hidden' : ''}>
+          <CartTab columns={columns} isAdmin={false} />
+        </div>
+
+        {/* 입고 확인 탭 */}
+        {tab === 'receiving' && (
+          <ReceivingsPanel receivings={receivings} closings={closings} onRefresh={fetchData} isAdmin={false} />
+        )}
+
+        {/* 마감자료 탭 */}
+        {tab === 'closing_data' && (
+          <ClosingDataTab adminName={userName} isAdmin={false} />
+        )}
+
+        {/* 총 구매내역 탭 */}
+        {tab === 'purchase_history' && (
+          <PurchaseHistoryTab isAdmin={false} />
+        )}
+
+        {/* 칼럼 이력 탭 */}
+        {tab === 'columns' && (
+          <IndividualColumnTab columns={columns} isAdmin={false} />
         )}
       </main>
+
+      {/* 칼럼 상세 다이얼로그 (읽기 전용) */}
+      {detailColumn && (
+        <ColumnDetailDialog
+          column={detailColumn}
+          onClose={() => setDetailColumn(null)}
+          isAdmin={false}
+        />
+      )}
 
       {/* 칼럼 선택 구매 요청 다이얼로그 */}
       {selectedColumn && (

@@ -16,11 +16,12 @@ interface ColumnUsage {
 
 interface Props {
   columns: ColumnModel[];
+  isAdmin?: boolean;
 }
 
 const START_YEAR = 2026;
 
-export default function IndividualColumnTab({ columns }: Props) {
+export default function IndividualColumnTab({ columns, isAdmin = true }: Props) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(Math.max(START_YEAR, currentYear));
   const [allRecords, setAllRecords] = useState<RecordWithModel[]>([]);
@@ -153,12 +154,14 @@ export default function IndividualColumnTab({ columns }: Props) {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => { setAddModelId(''); setShowAdd(true); }}
-            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm"
-          >
-            <Plus className="w-4 h-4" /> 이력 추가
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setAddModelId(''); setShowAdd(true); }}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm"
+            >
+              <Plus className="w-4 h-4" /> 이력 추가
+            </button>
+          )}
         </div>
       </div>
 
@@ -241,12 +244,14 @@ export default function IndividualColumnTab({ columns }: Props) {
                         <span className="text-xs font-semibold text-gray-600">
                           {selectedYear}년 사용 이력 ({expandedRecords.length}건)
                         </span>
-                        <button
-                          onClick={() => { setAddModelId(col.id); setShowAdd(true); }}
-                          className="px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 flex items-center gap-1"
-                        >
-                          <Plus className="w-3 h-3" /> 이력 추가
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => { setAddModelId(col.id); setShowAdd(true); }}
+                            className="px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 flex items-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" /> 이력 추가
+                          </button>
+                        )}
                       </div>
 
                       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -264,7 +269,7 @@ export default function IndividualColumnTab({ columns }: Props) {
                                 <th className="px-3 py-2 text-left">제품명</th>
                                 <th className="px-3 py-2 text-left">시험항목</th>
                                 <th className="px-3 py-2 text-left">교체사유</th>
-                                <th className="px-3 py-2 text-center">작업</th>
+                                {isAdmin && <th className="px-3 py-2 text-center">작업</th>}
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -278,16 +283,18 @@ export default function IndividualColumnTab({ columns }: Props) {
                                   <td className="px-3 py-2">{rec.product_name || '-'}</td>
                                   <td className="px-3 py-2">{rec.test_item || '-'}</td>
                                   <td className="px-3 py-2 text-gray-500">{rec.replacement_reason || '-'}</td>
-                                  <td className="px-3 py-2 text-center">
-                                    <div className="flex items-center justify-center gap-1">
-                                      <button onClick={() => setEditing(rec)} className="p-1 hover:bg-blue-50 rounded text-blue-600">
-                                        <Pencil className="w-3 h-3" />
-                                      </button>
-                                      <button onClick={() => handleDelete(rec.id)} className="p-1 hover:bg-red-50 rounded text-red-500">
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  </td>
+                                  {isAdmin && (
+                                    <td className="px-3 py-2 text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button onClick={() => setEditing(rec)} className="p-1 hover:bg-blue-50 rounded text-blue-600">
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button onClick={() => handleDelete(rec.id)} className="p-1 hover:bg-red-50 rounded text-red-500">
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  )}
                                 </tr>
                               ))}
                             </tbody>
@@ -304,7 +311,7 @@ export default function IndividualColumnTab({ columns }: Props) {
       </div>
 
       {/* 이력 추가 다이얼로그 */}
-      {showAdd && (
+      {isAdmin && showAdd && (
         <IndividualColumnDialog
           columns={columns}
           initialModelId={addModelId}
@@ -319,7 +326,7 @@ export default function IndividualColumnTab({ columns }: Props) {
       )}
 
       {/* 수정 다이얼로그 */}
-      {editing && (
+      {isAdmin && editing && (
         <IndividualColumnDialog
           columns={columns}
           record={editing}

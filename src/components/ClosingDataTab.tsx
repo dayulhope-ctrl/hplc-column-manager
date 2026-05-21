@@ -6,9 +6,10 @@ import { ReceivingRecord, MonthlyClosing } from '@/types';
 
 interface Props {
   adminName: string;
+  isAdmin?: boolean;
 }
 
-export default function ClosingDataTab({ adminName }: Props) {
+export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -88,10 +89,12 @@ export default function ClosingDataTab({ adminName }: Props) {
         <div className="flex items-center gap-2">
           <input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)}
             className="px-3 py-1.5 border rounded-lg text-sm" />
-          <a href={`/api/export/closings?year=${currentMonth.slice(0, 4)}`} download
-            className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-xs">
-            <Download className="w-3.5 h-3.5" /> 엑셀
-          </a>
+          {isAdmin && (
+            <a href={`/api/export/closings?year=${currentMonth.slice(0, 4)}`} download
+              className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-xs">
+              <Download className="w-3.5 h-3.5" /> 엑셀
+            </a>
+          )}
         </div>
       </div>
 
@@ -118,7 +121,7 @@ export default function ClosingDataTab({ adminName }: Props) {
             <span className="text-sm font-semibold text-gray-700">
               월 입고 합계 <span className="text-blue-700">₩{totalAmt.toLocaleString()}</span>
             </span>
-            {!isAlreadyClosed && (
+            {isAdmin && !isAlreadyClosed && (
               <button onClick={handleClose} disabled={closing || receivings.length === 0}
                 className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5 text-sm font-medium">
                 <CheckCircle className="w-4 h-4" />
@@ -195,12 +198,12 @@ export default function ClosingDataTab({ adminName }: Props) {
                 <th className="px-4 py-2 text-left">마감일</th>
                 <th className="px-4 py-2 text-left">담당자</th>
                 <th className="px-4 py-2 text-center">상세</th>
-                <th className="px-4 py-2 text-center">삭제</th>
+                {isAdmin && <th className="px-4 py-2 text-center">삭제</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {closings.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">마감 이력이 없습니다</td></tr>
+                <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 py-8 text-center text-gray-400">마감 이력이 없습니다</td></tr>
               ) : closings.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2 font-medium">{c.month}</td>
@@ -213,12 +216,14 @@ export default function ClosingDataTab({ adminName }: Props) {
                     <button onClick={() => setSelectedClosing(c)}
                       className="px-2 py-0.5 border rounded text-xs hover:bg-gray-100">보기</button>
                   </td>
-                  <td className="px-4 py-2 text-center">
-                    <button onClick={() => handleDeleteClosing(c.month)}
-                      className="p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
+                  {isAdmin && (
+                    <td className="px-4 py-2 text-center">
+                      <button onClick={() => handleDeleteClosing(c.month)}
+                        className="p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

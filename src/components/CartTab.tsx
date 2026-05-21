@@ -14,8 +14,9 @@ interface CartItem {
 
 interface Props {
   columns: ColumnModel[];
-  adminName: string;
+  adminName?: string;
   onRequestCreated?: () => void;
+  isAdmin?: boolean;
 }
 
 const URGENCY_OPTIONS = [
@@ -37,7 +38,7 @@ function makeItem(col: ColumnModel): CartItem {
   };
 }
 
-export default function CartTab({ columns, adminName, onRequestCreated }: Props) {
+export default function CartTab({ columns, adminName, onRequestCreated, isAdmin = true }: Props) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -176,12 +177,14 @@ export default function CartTab({ columns, adminName, onRequestCreated }: Props)
           <ShoppingCart className="w-5 h-5" />
           장바구니 관리
         </h2>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm"
-        >
-          <Plus className="w-4 h-4" /> 수동 추가
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm"
+          >
+            <Plus className="w-4 h-4" /> 수동 추가
+          </button>
+        )}
       </div>
 
       {message && (
@@ -211,9 +214,11 @@ export default function CartTab({ columns, adminName, onRequestCreated }: Props)
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs text-gray-600 border-b">
                 <tr>
-                  <th className="px-3 py-2 text-center w-10">
-                    <input type="checkbox" checked={allChecked} onChange={toggleAll} className="rounded" />
-                  </th>
+                  {isAdmin && (
+                    <th className="px-3 py-2 text-center w-10">
+                      <input type="checkbox" checked={allChecked} onChange={toggleAll} className="rounded" />
+                    </th>
+                  )}
                   <th className="px-3 py-2 text-left">모델명</th>
                   <th className="px-3 py-2 text-left">Cat. No</th>
                   <th className="px-3 py-2 text-left">KEP 코드</th>
@@ -227,20 +232,26 @@ export default function CartTab({ columns, adminName, onRequestCreated }: Props)
               <tbody className="divide-y divide-gray-100">
                 {cart.map(item => (
                   <tr key={item.column.id} className={`hover:bg-gray-50 ${item.checked ? 'bg-blue-50' : ''}`}>
-                    <td className="px-3 py-2 text-center">
-                      <input type="checkbox" checked={item.checked} onChange={() => toggleItem(item.column.id)} className="rounded" />
-                    </td>
+                    {isAdmin && (
+                      <td className="px-3 py-2 text-center">
+                        <input type="checkbox" checked={item.checked} onChange={() => toggleItem(item.column.id)} className="rounded" />
+                      </td>
+                    )}
                     <td className="px-3 py-2 font-medium text-gray-900">{item.column.model_name}</td>
                     <td className="px-3 py-2 font-mono text-xs text-gray-600">{item.column.cat_no}</td>
                     <td className="px-3 py-2 font-mono text-xs text-gray-600">{item.column.kep_code || '-'}</td>
                     <td className="px-3 py-2">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => updateQty(item.column.id, -1)}
-                          className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100 text-xs">－</button>
-                        <span className="w-8 text-center font-semibold">{item.quantity}</span>
-                        <button onClick={() => updateQty(item.column.id, 1)}
-                          className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100 text-xs">＋</button>
-                      </div>
+                      {isAdmin ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => updateQty(item.column.id, -1)}
+                            className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100 text-xs">－</button>
+                          <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                          <button onClick={() => updateQty(item.column.id, 1)}
+                            className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100 text-xs">＋</button>
+                        </div>
+                      ) : (
+                        <span className="block text-center font-semibold">{item.quantity}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right text-gray-700">₩{item.column.unit_price.toLocaleString()}</td>
                     <td className="px-3 py-2 text-right font-semibold text-blue-700">
@@ -252,11 +263,17 @@ export default function CartTab({ columns, adminName, onRequestCreated }: Props)
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <select value={item.urgency}
-                        onChange={e => setCart(prev => prev.map(i => i.column.id === item.column.id ? { ...i, urgency: e.target.value as any } : i))}
-                        className="px-1.5 py-0.5 border rounded text-xs bg-white">
-                        {URGENCY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
+                      {isAdmin ? (
+                        <select value={item.urgency}
+                          onChange={e => setCart(prev => prev.map(i => i.column.id === item.column.id ? { ...i, urgency: e.target.value as any } : i))}
+                          className="px-1.5 py-0.5 border rounded text-xs bg-white">
+                          {URGENCY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-gray-600">
+                          {URGENCY_OPTIONS.find(o => o.value === item.urgency)?.label || item.urgency}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -266,7 +283,7 @@ export default function CartTab({ columns, adminName, onRequestCreated }: Props)
         )}
 
         {/* 하단 액션 바 */}
-        {cart.length > 0 && (
+        {cart.length > 0 && isAdmin && (
           <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
             <div className="flex items-center gap-3">
               <span className="text-sm text-gray-600">{checkedCount}개 항목 선택됨</span>
@@ -293,6 +310,14 @@ export default function CartTab({ columns, adminName, onRequestCreated }: Props)
             </div>
           </div>
         )}
+        {/* 읽기 전용 합계 표시 */}
+        {cart.length > 0 && !isAdmin && (
+          <div className="flex items-center justify-end px-4 py-3 border-t bg-gray-50">
+            <span className="text-sm text-gray-600 font-medium">
+              예상 합계: <span className="text-blue-700 font-bold">₩{totalEstimate.toLocaleString()}</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 구매 진행 현황 */}
@@ -310,7 +335,7 @@ export default function CartTab({ columns, adminName, onRequestCreated }: Props)
       </div>
 
       {/* 칼럼 추가 모달 */}
-      {showAddModal && (
+      {isAdmin && showAddModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-xl">
             <div className="flex items-center justify-between p-4 border-b">
