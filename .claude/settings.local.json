@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__d9960f65-27f3-4f86-8b2c-30908396bc09__execute_sql",
+      "mcp__d9960f65-27f3-4f86-8b2c-30908396bc09__get_publishable_keys",
+      "mcp__d9960f65-27f3-4f86-8b2c-30908396bc09__get_project_url",
+      "mcp__d9960f65-27f3-4f86-8b2c-30908396bc09__apply_migration",
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Bash(mkdir \"C:\\\\Users\\\\user\\\\Downloads\\\\hplc-system\\\\hplc-system\\\\src\\\\app\\\\api\\\\individual-columns\\\\[id]\" 2>&1; echo done)",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\user\\\\Downloads\\\\hplc-system\\\\hplc-system\\\\src\\\\app\\\\api\\\\export\\\\inventory\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\user\\\\Downloads\\\\hplc-system\\\\hplc-system\\\\src\\\\app\\\\api\\\\export\\\\requests\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\user\\\\Downloads\\\\hplc-system\\\\hplc-system\\\\src\\\\app\\\\api\\\\export\\\\receivings\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\user\\\\Downloads\\\\hplc-system\\\\hplc-system\\\\src\\\\app\\\\api\\\\export\\\\closings\")",
+      "Bash(npx tsc *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\user\\\\Desktop\\\\다운로드\\\\column-companion-extracted\\\\src\" -Recurse -Filter \"*.tsx\" -File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(find \"C:\\\\Users\\\\user\\\\Desktop\\\\다운로드\\\\column-companion-extracted\\\\src\" -name \"*.tsx\" -o -name \"*.ts\" | head -30)",
+      "Bash(npx next *)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}
