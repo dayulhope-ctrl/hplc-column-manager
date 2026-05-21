@@ -201,7 +201,15 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
                   <Package className="w-5 h-5" />
                   칼럼 모델별 재고 현황
                 </h2>
-                <span className="text-sm text-gray-500">{filteredColumns.length}개</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">{filteredColumns.length}개</span>
+                  <button
+                    onClick={() => setShowAddRequest(true)}
+                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4" /> 구매요청 추가
+                  </button>
+                </div>
               </div>
               {loading ? (
                 <div className="bg-white rounded-xl p-12 text-center text-gray-400">로딩 중...</div>

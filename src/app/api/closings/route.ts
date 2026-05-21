@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, requireAuth } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    await requireAdmin();
+    await requireAuth();
     const sb = createServerClient();
 
     const { data, error } = await sb
