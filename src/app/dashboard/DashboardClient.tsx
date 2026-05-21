@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Package, FlaskConical, ShoppingCart, CheckCircle, Activity, Search, AlertTriangle, ClipboardList, Plus } from 'lucide-react';
+import { Package, FlaskConical, ShoppingCart, CheckCircle, Activity, Search, ClipboardList, Plus } from 'lucide-react';
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
 import ColumnTable from '@/components/ColumnTable';
@@ -76,11 +76,6 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
     return result;
   }, [columns, search, filter]);
 
-  const lowStockColumns = useMemo(() => 
-    columns.filter(c => c.total_stock === 0 && !c.purchase_status),
-    [columns]
-  );
-
   const handlePurchaseRequest = async (data: { quantity: number; reason: string; urgency: string }) => {
     if (!selectedColumn) return;
     const res = await fetch('/api/requests', {
@@ -109,31 +104,6 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
             message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
             {message.text}
-          </div>
-        )}
-
-        {/* 재고 부족 알림 */}
-        {lowStockColumns.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-amber-900">재고 부족 알림</h3>
-                <p className="text-sm text-amber-800 mt-1">
-                  {lowStockColumns.length}개 모델의 재고가 부족합니다 (재고 0개, 발주 미진행)
-                </p>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {lowStockColumns.slice(0, 5).map(c => (
-                    <span key={c.id} className="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">
-                      {c.model_name} ({c.cat_no})
-                    </span>
-                  ))}
-                  {lowStockColumns.length > 5 && (
-                    <span className="text-xs text-amber-700">외 {lowStockColumns.length - 5}개</span>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
