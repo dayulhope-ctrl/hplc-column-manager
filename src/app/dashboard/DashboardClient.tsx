@@ -186,7 +186,7 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
                 <StatsCard icon={FlaskConical} label="총 재고" value={stats.totalStock} description="보유 수량" color="green" />
                 <StatsCard icon={ShoppingCart} label="구매 필요" value={stats.purchaseRequiredCount} description="재고 0개" color="red" />
                 <StatsCard icon={CheckCircle} label="발주 완료" value={stats.orderCompletedCount} description="진행 중" color="amber" />
-                <StatsCard icon={Activity} label="총 자산가치" value={`₩${(stats.totalValue / 10000).toFixed(0)}만`} description="현재 재고" color="purple" />
+                <StatsCard icon={Activity} label="총 자산가치" value={`₩${stats.totalValue.toLocaleString()}원`} description="현재 재고" color="purple" />
               </div>
             )}
 
@@ -249,32 +249,29 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
                     <tr>
                       <th className="px-4 py-3 text-left">요청일</th>
                       <th className="px-4 py-3 text-left">요청자</th>
-                      <th className="px-4 py-3 text-left">칼럼</th>
+                      <th className="px-4 py-3 text-left">모델명</th>
+                      <th className="px-4 py-3 text-left">Cat. No</th>
                       <th className="px-4 py-3 text-center">수량</th>
-                      <th className="px-4 py-3 text-center">긴급도</th>
+                      <th className="px-4 py-3 text-left">요청사유</th>
                       <th className="px-4 py-3 text-center">상태</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {requests.length === 0 ? (
-                      <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">구매 요청 내역이 없습니다</td></tr>
+                      <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">구매 요청 내역이 없습니다</td></tr>
                     ) : requests.map(req => (
                       <tr key={req.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-600 text-xs">
                           {new Date(req.created_at).toLocaleDateString('ko-KR')}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-gray-900">{req.requested_by}</div>
-                          {req.department && <div className="text-xs text-gray-500">{req.department}</div>}
+                          <div className="font-medium text-gray-900 text-xs">{req.requested_by}</div>
+                          {req.department && <div className="text-xs text-gray-400">{req.department}</div>}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-gray-900">{req.column_models?.model_name}</div>
-                          <div className="text-xs text-gray-500 font-mono">{req.column_models?.cat_no}</div>
-                        </td>
+                        <td className="px-4 py-3 font-medium text-gray-900 text-sm">{req.column_models?.model_name}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-gray-500">{req.column_models?.cat_no}</td>
                         <td className="px-4 py-3 text-center font-semibold">{req.quantity}</td>
-                        <td className="px-4 py-3 text-center">
-                          <UrgencyBadge urgency={req.urgency} />
-                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600">{req.reason || '-'}</td>
                         <td className="px-4 py-3 text-center">
                           <StatusBadge status={req.status} />
                         </td>
@@ -322,16 +319,5 @@ function StatusBadge({ status }: { status: string }) {
     received: { label: '입고 완료', className: 'bg-green-100 text-green-800' },
   };
   const m = map[status] || { label: status, className: 'bg-gray-100 text-gray-700' };
-  return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${m.className}`}>{m.label}</span>;
-}
-
-function UrgencyBadge({ urgency }: { urgency: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    low: { label: '낮음', className: 'bg-gray-100 text-gray-700' },
-    normal: { label: '보통', className: 'bg-blue-50 text-blue-700' },
-    high: { label: '높음', className: 'bg-orange-100 text-orange-800' },
-    urgent: { label: '긴급', className: 'bg-red-100 text-red-800' },
-  };
-  const m = map[urgency] || { label: urgency, className: 'bg-gray-100 text-gray-700' };
   return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${m.className}`}>{m.label}</span>;
 }
