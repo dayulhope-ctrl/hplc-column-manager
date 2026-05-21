@@ -9,7 +9,7 @@ interface Props {
   requests: PurchaseRequest[];
   onAction: (id: string, action: 'approve' | 'reject' | 'order' | 'receive', notes?: string) => Promise<void>;
   onRefresh: () => void;
-  adminName: string;
+  adminName?: string;
   isAdmin?: boolean;
 }
 

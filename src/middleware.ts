@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 
-// 보호된 페이지
-const PROTECTED_PATHS = ['/dashboard', '/admin'];
+// 보호된 페이지 (dashboard는 게스트 접근 허용)
+const PROTECTED_PATHS = ['/admin'];
 const ADMIN_ONLY_PATHS = ['/admin'];
 
 // IP 화이트리스트 (필요시 환경변수에서)
@@ -32,12 +32,12 @@ export async function middleware(req: NextRequest) {
 
   const token = req.cookies.get('session_token')?.value;
   if (!token) {
-    return NextResponse.redirect(new URL('/', req.url));
+    return NextResponse.redirect(new URL('/login', req.url));
   }
 
   const session = await verifyToken(token);
   if (!session) {
-    const res = NextResponse.redirect(new URL('/', req.url));
+    const res = NextResponse.redirect(new URL('/login', req.url));
     res.cookies.delete('session_token');
     return res;
   }
@@ -53,7 +53,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/dashboard/:path*',
     '/admin/:path*',
   ],
 };

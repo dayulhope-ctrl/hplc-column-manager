@@ -5,7 +5,7 @@ import { FileText, CheckCircle, Calendar, Download, Trash2 } from 'lucide-react'
 import { ReceivingRecord, MonthlyClosing } from '@/types';
 
 interface Props {
-  adminName: string;
+  adminName?: string;
   isAdmin?: boolean;
 }
 

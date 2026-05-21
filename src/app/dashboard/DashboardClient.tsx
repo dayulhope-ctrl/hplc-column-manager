@@ -19,13 +19,51 @@ import ReceivingsPanel from '@/components/ReceivingsPanel';
 import { ColumnModel, DashboardStats, PurchaseRequest, ReceivingRecord, MonthlyClosing } from '@/types';
 
 interface Props {
-  userName: string;
+  userName: string | null;
   isAdmin: boolean;
 }
 
 type TabType = 'dashboard' | 'requests' | 'cart' | 'receiving' | 'closing_data' | 'purchase_history' | 'columns';
 
-export default function DashboardClient({ userName, isAdmin }: Props) {
+export default function DashboardClient({ userName: initialUserName, isAdmin }: Props) {
+  // 게스트 이름: localStorage에서 복원 또는 null
+  const [guestName, setGuestName] = useState<string | null>(null);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  // localStorage에서 저장된 이름 복원
+  useEffect(() => {
+    if (!initialUserName && !isAdmin) {
+      const saved = localStorage.getItem('hplc_guest_name');
+      if (saved) setGuestName(saved);
+    }
+  }, [initialUserName, isAdmin]);
+
+  const userName = initialUserName ?? guestName;
+
+  // 이름이 필요한 액션 실행 전 확인
+  const requireName = (action: () => void) => {
+    if (userName) {
+      action();
+    } else {
+      setPendingAction(() => action);
+      setShowNameModal(true);
+    }
+  };
+
+  const handleNameSubmit = () => {
+    const name = nameInput.trim();
+    if (!name) return;
+    localStorage.setItem('hplc_guest_name', name);
+    setGuestName(name);
+    setShowNameModal(false);
+    setNameInput('');
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  };
   const [tab, setTab] = useState<TabType>('dashboard');
   const [columns, setColumns] = useState<ColumnModel[]>([]);
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
@@ -100,6 +138,7 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         column_model_id: selectedColumn.id,
+        requester_name: userName ?? '익명',
         ...data,
       }),
     });
@@ -113,6 +152,40 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header userName={userName} isAdmin={isAdmin} />
+
+      {/* 이름 입력 모달 (게스트용) */}
+      {showNameModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">이름을 알려주세요</h2>
+            <p className="text-sm text-gray-500 mb-4">구매 신청에 이름이 필요합니다. 한 번 입력하면 다음부터 자동으로 기억됩니다.</p>
+            <input
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleNameSubmit()}
+              placeholder="홍길동"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowNameModal(false); setPendingAction(null); }}
+                className="flex-1 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleNameSubmit}
+                disabled={!nameInput.trim()}
+                className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* 메시지 */}
@@ -216,7 +289,7 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
               ) : (
                 <ColumnTable
                   columns={filteredColumns}
-                  onRequestPurchase={setSelectedColumn}
+                  onRequestPurchase={(col) => requireName(() => setSelectedColumn(col))}
                   onRowClick={setDetailColumn}
                 />
               )}
@@ -230,7 +303,7 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
             requests={requests}
             onAction={async () => {}}
             onRefresh={fetchData}
-            adminName={userName}
+            adminName={userName ?? undefined}
             isAdmin={false}
           />
         )}
@@ -247,7 +320,7 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
 
         {/* 마감자료 탭 */}
         {tab === 'closing_data' && (
-          <ClosingDataTab adminName={userName} isAdmin={false} />
+          <ClosingDataTab adminName={userName ?? undefined} isAdmin={false} />
         )}
 
         {/* 총 구매내역 탭 */}
@@ -282,7 +355,7 @@ export default function DashboardClient({ userName, isAdmin }: Props) {
       {/* 자유형식 구매요청 추가 다이얼로그 */}
       {showAddRequest && (
         <PurchaseRequestAddDialog
-          defaultRequester={userName}
+          defaultRequester={userName ?? undefined}
           onClose={() => setShowAddRequest(false)}
           onSaved={() => {
             setShowAddRequest(false);
