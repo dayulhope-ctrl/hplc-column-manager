@@ -29,6 +29,7 @@ const URGENCY_OPTIONS = [
 ];
 
 const CART_KEY = 'hplc_cart_v2';
+const REMOVED_KEY = 'hplc_cart_removed_v2';
 
 function makeItem(col: ColumnModel): CartItem {
   return {
@@ -44,6 +45,7 @@ export default function CartTab({ columns, approvedRequests, adminName, onOrderC
   // ── 섹션 B 상태 ──
   const [cart, setCart] = useState<CartItem[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [manuallyRemovedIds, setManuallyRemovedIds] = useState<Set<string>>(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -73,11 +75,24 @@ export default function CartTab({ columns, approvedRequests, adminName, onOrderC
     if (initialized) {
       setCart(prev => {
         const ids = new Set(prev.map(i => i.column.id));
-        const newItems = columns.filter(c => c.total_stock === 0 && !ids.has(c.id) && c.purchase_status !== '발주 완료').map(makeItem);
+        const newItems = columns.filter(c =>
+          c.total_stock === 0 &&
+          !ids.has(c.id) &&
+          c.purchase_status !== '발주 완료' &&
+          !manuallyRemovedIds.has(c.id)
+        ).map(makeItem);
         return newItems.length > 0 ? [...prev, ...newItems] : prev;
       });
       return;
     }
+    // 수동 삭제 목록 복원
+    let removedIds = new Set<string>();
+    try {
+      const savedRemoved = localStorage.getItem(REMOVED_KEY);
+      if (savedRemoved) removedIds = new Set(JSON.parse(savedRemoved));
+    } catch { /* 무시 */ }
+    setManuallyRemovedIds(removedIds);
+
     const saved = localStorage.getItem(CART_KEY);
     const restored: CartItem[] = [];
     const savedIds = new Set<string>();
@@ -93,10 +108,10 @@ export default function CartTab({ columns, approvedRequests, adminName, onOrderC
         }
       } catch { /* 파싱 실패 무시 */ }
     }
-    const newItems = columns.filter(c => c.total_stock === 0 && !savedIds.has(c.id) && c.purchase_status !== '발주 완료').map(makeItem);
+    const newItems = columns.filter(c => c.total_stock === 0 && !savedIds.has(c.id) && c.purchase_status !== '발주 완료' && !removedIds.has(c.id)).map(makeItem);
     setCart([...restored, ...newItems]);
     setInitialized(true);
-  }, [columns]);
+  }, [columns, manuallyRemovedIds]);
 
   // ── 섹션 A: 승인된 요청 삭제 ──
   const handleDeleteApproved = async (id: string) => {
@@ -189,6 +204,13 @@ export default function CartTab({ columns, approvedRequests, adminName, onOrderC
       setMessage({ type: 'success', text: `${targets.length}건 발주 완료 처리되었습니다` });
       setCart(prev => prev.filter(i => !targets.some(t => t.column.id === i.column.id)));
       setCheckedB(new Set());
+      // 발주 완료된 항목은 removed 목록에서 제거 (purchase_status가 바뀌어 자동 추가되지 않음)
+      setManuallyRemovedIds(prev => {
+        const next = new Set(prev);
+        targets.forEach(t => next.delete(t.column.id));
+        localStorage.setItem(REMOVED_KEY, JSON.stringify([...next]));
+        return next;
+      });
       onOrderCompleted?.();
     } else {
       setMessage({ type: 'error', text: `${failCount}건 처리 실패` });
@@ -198,7 +220,14 @@ export default function CartTab({ columns, approvedRequests, adminName, onOrderC
   const updateQty = (id: string, delta: number) =>
     setCart(prev => prev.map(i => i.column.id === id ? { ...i, quantity: Math.max(1, i.quantity + delta) } : i));
 
-  const removeFromCart = (id: string) => setCart(prev => prev.filter(i => i.column.id !== id));
+  const removeFromCart = (id: string) => {
+    setCart(prev => prev.filter(i => i.column.id !== id));
+    setManuallyRemovedIds(prev => {
+      const next = new Set(prev).add(id);
+      localStorage.setItem(REMOVED_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  };
 
   const addToCart = (col: ColumnModel) => {
     if (cart.some(item => item.column.id === col.id)) return;
