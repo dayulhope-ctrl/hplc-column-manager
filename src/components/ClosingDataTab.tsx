@@ -68,6 +68,18 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
   const totalQty = receivings.reduce((s, r) => s + r.quantity, 0);
   const totalAmt = receivings.reduce((s, r) => s + (r.total_price || 0), 0);
 
+  const handleCancelReceive = async (id: string) => {
+    if (!confirm('이 입고 기록을 취소하시겠습니까?\n재고가 원복되고 입고 대기 상태로 돌아갑니다.')) return;
+    const res = await fetch(`/api/receivings/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setMessage({ type: 'success', text: '입고 기록이 취소되었습니다' });
+      fetchData();
+    } else {
+      const err = await res.json();
+      setMessage({ type: 'error', text: err.error || '취소 실패' });
+    }
+  };
+
   const handleDeleteClosing = async (month: string) => {
     if (!confirm(`${month} 마감 기록을 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.`)) return;
     const res = await fetch(`/api/closings/${month}`, { method: 'DELETE' });
@@ -150,6 +162,7 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
                   <th className="px-3 py-2 text-right">단가</th>
                   <th className="px-3 py-2 text-right">입고금액</th>
                   <th className="px-3 py-2 text-left">입고일</th>
+                  {isAdmin && !isAlreadyClosed && <th className="px-3 py-2 text-center">취소</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -167,6 +180,16 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
                     <td className="px-3 py-2 text-right text-xs">₩{rec.unit_price?.toLocaleString() || '-'}</td>
                     <td className="px-3 py-2 text-right font-semibold">₩{rec.total_price?.toLocaleString() || '-'}</td>
                     <td className="px-3 py-2 text-xs">{rec.receiving_date}</td>
+                    {isAdmin && !isAlreadyClosed && (
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => handleCancelReceive(rec.id)}
+                          className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200"
+                        >
+                          취소
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 <tr className="bg-blue-50 font-semibold text-sm">
@@ -175,6 +198,7 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
                   <td className="px-3 py-2"></td>
                   <td className="px-3 py-2 text-right text-blue-700">₩{totalAmt.toLocaleString()}</td>
                   <td className="px-3 py-2"></td>
+                  {isAdmin && !isAlreadyClosed && <td className="px-3 py-2"></td>}
                 </tr>
               </tbody>
             </table>

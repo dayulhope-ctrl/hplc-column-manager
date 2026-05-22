@@ -60,6 +60,23 @@ export default function ReceivingsPanel({
     }
   };
 
+  // 발주 취소 (ordered → approved)
+  const handleCancelOrder = async (id: string) => {
+    if (!confirm('발주를 취소하고 장바구니로 되돌리시겠습니까?')) return;
+    try {
+      const res = await fetch(`/api/requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel_order' }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setMessage({ type: 'success', text: '발주가 취소되어 장바구니로 복귀되었습니다' });
+      onRefresh();
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message || '발주 취소 실패' });
+    }
+  };
+
   // 마감 상태
   const closedMonths = new Set(closings.map(c => c.month));
 
@@ -73,7 +90,7 @@ export default function ReceivingsPanel({
         {isAdmin && (
           <a href="/api/export/receivings" download
             className="px-2.5 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-xs">
-            <Download className="w-3.5 h-3.5" /> 엑셀
+            <Download className="w-3.5 h-3.5" /> 입고완료기록
           </a>
         )}
       </div>
@@ -137,13 +154,21 @@ export default function ReceivingsPanel({
                     </td>
                     {isAdmin && (
                       <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => openReceiveModal(req)}
-                          className="px-3 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 flex items-center gap-1 mx-auto"
-                        >
-                          <CheckCircle className="w-3 h-3" />
-                          입고확인
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => openReceiveModal(req)}
+                            className="px-3 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 flex items-center gap-1"
+                          >
+                            <CheckCircle className="w-3 h-3" />
+                            입고확인
+                          </button>
+                          <button
+                            onClick={() => handleCancelOrder(req.id)}
+                            className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded-lg hover:bg-gray-300"
+                          >
+                            발주취소
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>

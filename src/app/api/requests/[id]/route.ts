@@ -9,7 +9,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const body = await req.json();
     const { action, notes, unit_price, receiving_date } = body;
 
-    if (!['approve', 'reject', 'order', 'receive'].includes(action)) {
+    if (!['approve', 'reject', 'order', 'receive', 'cancel_order'].includes(action)) {
       return NextResponse.json({ error: '잘못된 액션' }, { status: 400 });
     }
 
@@ -89,6 +89,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         receiving_date: finalReceivingDate,
         received_by: admin.username,
       });
+    }
+
+    if (action === 'cancel_order') {
+      updateData.status = 'approved';
+      updateData.ordered_at = null;
+      // 칼럼 발주 상태 초기화
+      await sb
+        .from('column_models')
+        .update({ purchase_status: null, purchase_quantity: null, order_date: null })
+        .eq('id', request.column_model_id);
     }
 
     const { data, error } = await sb

@@ -15,6 +15,9 @@ interface ColumnTableProps {
 }
 
 export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdit, onDelete, onRowClick, usageMap }: ColumnTableProps) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="overflow-x-auto">
@@ -50,7 +53,17 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
                         {isOutOfStock && (
                           <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500" />
                         )}
-                        <div className="relative group inline-block">
+                        <div
+                          className="inline-block"
+                          onMouseEnter={(e) => {
+                            if (usageMap?.[col.id]?.length) {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setTooltipPos({ x: rect.left, y: rect.bottom + 6 });
+                              setHoveredId(col.id);
+                            }
+                          }}
+                          onMouseLeave={() => setHoveredId(null)}
+                        >
                           {onRowClick ? (
                             <button
                               onClick={() => onRowClick(col)}
@@ -61,16 +74,6 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
                           ) : (
                             <span className="truncate max-w-[200px] cursor-default">{col.model_name}</span>
                           )}
-                          {usageMap?.[col.id]?.length ? (
-                            <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[180px] max-w-[260px]">
-                              <p className="text-xs font-semibold text-gray-500 mb-1.5">사용 제품 목록</p>
-                              <ul className="space-y-0.5">
-                                {usageMap[col.id].map((name, i) => (
-                                  <li key={i} className="text-xs text-gray-700">{i + 1}. {name}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : null}
                         </div>
                       </div>
                     </td>
@@ -145,6 +148,20 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
           </tbody>
         </table>
       </div>
+      {/* 사용 제품 목록 툴팁 (fixed 위치 - overflow 제약 없음) */}
+      {hoveredId && usageMap?.[hoveredId]?.length ? (
+        <div
+          className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl p-3 min-w-[180px] max-w-[260px] pointer-events-none"
+          style={{ left: tooltipPos.x, top: tooltipPos.y }}
+        >
+          <p className="text-xs font-semibold text-gray-500 mb-1.5">사용 제품 목록</p>
+          <ul className="space-y-0.5">
+            {usageMap[hoveredId].map((name, i) => (
+              <li key={i} className="text-xs text-gray-700">{i + 1}. {name}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
