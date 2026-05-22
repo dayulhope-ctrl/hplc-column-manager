@@ -8,17 +8,26 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const modelId = searchParams.get('model_id');
 
+    // individual_columns 테이블에서 product_name + model_id 조회
     let query = sb
-      .from('usage_history')
-      .select('*, column_models(model_name, cat_no)')
-      .order('created_at', { ascending: false });
+      .from('individual_columns')
+      .select('id, model_id, product_name')
+      .not('product_name', 'is', null)
+      .neq('product_name', '');
 
-    if (modelId) query = query.eq('column_model_id', modelId);
+    if (modelId) query = query.eq('model_id', modelId);
 
     const { data, error } = await query;
     if (error) throw error;
 
-    return NextResponse.json({ records: data || [] });
+    // column_model_id 필드명으로 정규화 (기존 AdminClient/DashboardClient 코드와 호환)
+    const records = (data || []).map((r: any) => ({
+      id: r.id,
+      column_model_id: r.model_id,
+      product_name: r.product_name,
+    }));
+
+    return NextResponse.json({ records });
   } catch (e: any) {
     if (e.message?.includes('로그인') || e.message?.includes('관리자')) {
       return NextResponse.json({ error: e.message }, { status: 401 });
