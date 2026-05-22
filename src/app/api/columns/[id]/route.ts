@@ -14,7 +14,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       'model_name', 'cat_no', 'registration_date', 'size', 'particle_size',
       'total_stock', 'total_usage_count', 'min_safety_stock', 'unit_price',
       'kep_code', 'purchase_required', 'purchase_status', 'purchase_quantity',
-      'order_date', 'notes'
+      'order_date', 'notes', 'products_used'
     ];
     for (const key of allowedFields) {
       if (key in body) updateData[key] = body[key];

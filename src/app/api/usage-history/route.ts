@@ -8,24 +8,25 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const modelId = searchParams.get('model_id');
 
-    // individual_columns 테이블에서 product_name + model_id 조회
+    // column_models.products_used 에서 사용 제품 목록 조회
     let query = sb
-      .from('individual_columns')
-      .select('id, model_id, product_name')
-      .not('product_name', 'is', null)
-      .neq('product_name', '');
+      .from('column_models')
+      .select('id, products_used')
+      .not('products_used', 'is', null);
 
-    if (modelId) query = query.eq('model_id', modelId);
+    if (modelId) query = query.eq('id', modelId);
 
     const { data, error } = await query;
     if (error) throw error;
 
-    // column_model_id 필드명으로 정규화 (기존 AdminClient/DashboardClient 코드와 호환)
-    const records = (data || []).map((r: any) => ({
-      id: r.id,
-      column_model_id: r.model_id,
-      product_name: r.product_name,
-    }));
+    // AdminClient/DashboardClient 의 usageMap 빌더와 호환되는 형태로 평탄화
+    const records: { id: string; column_model_id: string; product_name: string }[] = [];
+    for (const row of data || []) {
+      const products: string[] = Array.isArray(row.products_used) ? row.products_used : [];
+      for (const name of products) {
+        if (name) records.push({ id: row.id, column_model_id: row.id, product_name: name });
+      }
+    }
 
     return NextResponse.json({ records });
   } catch (e: any) {

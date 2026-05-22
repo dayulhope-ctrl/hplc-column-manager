@@ -430,6 +430,7 @@ function ColumnEditDialog({ column, onClose, onSaved }: { column: ColumnModel; o
     min_safety_stock: column.min_safety_stock,
     unit_price: column.unit_price,
     kep_code: column.kep_code || '',
+    products_used_text: (column.products_used || []).join('\n'),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -438,10 +439,15 @@ function ColumnEditDialog({ column, onClose, onSaved }: { column: ColumnModel; o
     e.preventDefault();
     setLoading(true);
     setError('');
+    const { products_used_text, ...rest } = form;
+    const products_used = products_used_text
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
     const res = await fetch(`/api/columns/${column.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...rest, products_used }),
     });
     if (!res.ok) {
       const err = await res.json();
@@ -494,6 +500,15 @@ function ColumnEditDialog({ column, onClose, onSaved }: { column: ColumnModel; o
         <Field label="KEP 코드">
           <input value={form.kep_code} onChange={e => setForm({...form, kep_code: e.target.value})}
             className="w-full px-3 py-2 border rounded-lg" />
+        </Field>
+        <Field label="사용 제품 목록 (한 줄에 하나씩)">
+          <textarea
+            value={form.products_used_text}
+            onChange={e => setForm({...form, products_used_text: e.target.value})}
+            className="w-full px-3 py-2 border rounded-lg text-sm resize-none"
+            rows={4}
+            placeholder={"에너지비타500맥스액\n이뮤셉트캡슐\n마이레놀정"}
+          />
         </Field>
         {error && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
         <div className="flex gap-2 pt-2">
