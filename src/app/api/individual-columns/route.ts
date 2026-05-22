@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const sb = createServerClient();
     const body = await req.json();
 
-    const { model_id, column_code, status, start_date, user_name, product_name, test_item, usage_reason, notes } = body;
+    const { model_id, column_code, status, start_date, user_name, product_name, test_item, replacement_reason, usage_reason, notes } = body;
     if (!model_id || !status) {
       return NextResponse.json({ error: '필수 항목을 입력해주세요' }, { status: 400 });
     }
@@ -50,9 +50,10 @@ export async function POST(req: NextRequest) {
         user_name: user_name || null,
         product_name: product_name || null,
         test_item: test_item || null,
+        replacement_reason: replacement_reason || null,
         usage_reason: usage_reason || null,
         notes: notes || null,
-        usage_count: 0,
+        usage_count: 1,
       })
       .select()
       .single();

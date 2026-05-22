@@ -316,10 +316,19 @@ export default function IndividualColumnTab({ columns, isAdmin = true }: Props) 
           columns={columns}
           initialModelId={addModelId}
           onClose={() => setShowAdd(false)}
-          onSaved={() => {
+          onSaved={async () => {
             setShowAdd(false);
-            fetchAllRecords();
-            if (expandedId) handleExpand(expandedId);
+            await fetchAllRecords();
+            if (expandedId) {
+              const res2 = await fetch(`/api/individual-columns?model_id=${expandedId}`);
+              const data = await res2.json();
+              const filtered = (data.records || []).filter((r: RecordWithModel) => {
+                const dateStr = r.start_date || r.created_at;
+                if (!dateStr) return false;
+                return new Date(dateStr).getFullYear() === selectedYear;
+              });
+              setExpandedRecords(filtered);
+            }
             setMessage({ type: 'success', text: '이력이 추가되었습니다' });
           }}
         />
@@ -331,10 +340,19 @@ export default function IndividualColumnTab({ columns, isAdmin = true }: Props) 
           columns={columns}
           record={editing}
           onClose={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={async () => {
             setEditing(null);
-            fetchAllRecords();
-            if (expandedId) handleExpand(expandedId);
+            await fetchAllRecords();
+            if (expandedId) {
+              const res2 = await fetch(`/api/individual-columns?model_id=${expandedId}`);
+              const data = await res2.json();
+              const filtered = (data.records || []).filter((r: RecordWithModel) => {
+                const dateStr = r.start_date || r.created_at;
+                if (!dateStr) return false;
+                return new Date(dateStr).getFullYear() === selectedYear;
+              });
+              setExpandedRecords(filtered);
+            }
             setMessage({ type: 'success', text: '수정되었습니다' });
           }}
         />

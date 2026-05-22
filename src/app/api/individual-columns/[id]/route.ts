@@ -8,7 +8,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const sb = createServerClient();
     const body = await req.json();
 
-    const allowedFields = ['status', 'column_code', 'user_name', 'product_name', 'test_item',
+    const allowedFields = ['status', 'column_code', 'start_date', 'user_name', 'product_name', 'test_item',
       'last_used_date', 'replacement_reason', 'usage_reason', 'usage_count', 'notes'];
     const updates: Record<string, any> = {};
     for (const key of allowedFields) {
