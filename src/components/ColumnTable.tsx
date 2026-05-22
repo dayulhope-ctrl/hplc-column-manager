@@ -11,9 +11,10 @@ interface ColumnTableProps {
   onEdit?: (column: ColumnModel) => void;
   onDelete?: (column: ColumnModel) => void;
   onRowClick?: (column: ColumnModel) => void;
+  usageMap?: Record<string, string[]>; // column_model_id → product_name[]
 }
 
-export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdit, onDelete, onRowClick }: ColumnTableProps) {
+export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdit, onDelete, onRowClick, usageMap }: ColumnTableProps) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="overflow-x-auto">
@@ -49,16 +50,28 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
                         {isOutOfStock && (
                           <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500" />
                         )}
-                        {onRowClick ? (
-                          <button
-                            onClick={() => onRowClick(col)}
-                            className="truncate max-w-[200px] text-left text-blue-700 hover:underline font-medium"
-                          >
-                            {col.model_name}
-                          </button>
-                        ) : (
-                          <span className="truncate max-w-[200px]">{col.model_name}</span>
-                        )}
+                        <div className="relative group inline-block">
+                          {onRowClick ? (
+                            <button
+                              onClick={() => onRowClick(col)}
+                              className="truncate max-w-[200px] text-left text-blue-700 hover:underline font-medium"
+                            >
+                              {col.model_name}
+                            </button>
+                          ) : (
+                            <span className="truncate max-w-[200px] cursor-default">{col.model_name}</span>
+                          )}
+                          {usageMap?.[col.id]?.length ? (
+                            <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[180px] max-w-[260px]">
+                              <p className="text-xs font-semibold text-gray-500 mb-1.5">사용 제품 목록</p>
+                              <ul className="space-y-0.5">
+                                {usageMap[col.id].map((name, i) => (
+                                  <li key={i} className="text-xs text-gray-700">{i + 1}. {name}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-600 font-mono text-xs">{col.cat_no}</td>

@@ -91,6 +91,12 @@ export default function ReceivingsPanel({
           <span className="font-semibold text-sm text-orange-900">입고 대기 중</span>
           <span className="text-xs text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">{orderedRequests.length}건</span>
           <span className="text-xs text-gray-500 ml-1">— 물건이 도착하면 입고확인을 클릭하세요</span>
+          {isAdmin && orderedRequests.length > 0 && (
+            <a href="/api/export/ordered" download
+              className="ml-auto px-2.5 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-xs">
+              <Download className="w-3.5 h-3.5" /> 엑셀
+            </a>
+          )}
         </div>
 
         {orderedRequests.length === 0 ? (

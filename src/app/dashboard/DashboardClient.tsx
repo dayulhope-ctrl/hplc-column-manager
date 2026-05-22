@@ -71,6 +71,7 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
   const [receivings, setReceivings] = useState<ReceivingRecord[]>([]);
   const [closings, setClosings] = useState<MonthlyClosing[]>([]);
   const [chartData, setChartData] = useState<any>(null);
+  const [usageMap, setUsageMap] = useState<Record<string, string[]>>({});
   const [detailColumn, setDetailColumn] = useState<ColumnModel | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string>('all');
@@ -82,13 +83,14 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [colRes, statsRes, reqRes, recRes, chartRes, closingRes] = await Promise.all([
+      const [colRes, statsRes, reqRes, recRes, chartRes, closingRes, uhRes] = await Promise.all([
         fetch('/api/columns'),
         fetch('/api/stats'),
         fetch('/api/requests'),
         fetch('/api/receivings'),
         fetch('/api/stats/charts'),
         fetch('/api/closings'),
+        fetch('/api/usage-history'),
       ]);
       setColumns((await colRes.json()).columns || []);
       setStats((await statsRes.json()).stats);
@@ -97,6 +99,17 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
       const cd = await chartRes.json();
       setChartData(cd);
       setClosings((await closingRes.json()).closings || []);
+      // usage_history → column_model_id별 product_name 목록 Map 생성
+      const uhRecords = (await uhRes.json()).records || [];
+      const map: Record<string, string[]> = {};
+      uhRecords.forEach((r: any) => {
+        if (r.column_model_id && r.product_name) {
+          if (!map[r.column_model_id]) map[r.column_model_id] = [];
+          if (!map[r.column_model_id].includes(r.product_name))
+            map[r.column_model_id].push(r.product_name);
+        }
+      });
+      setUsageMap(map);
     } catch (e) {
       console.error(e);
     } finally {
@@ -291,6 +304,7 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
                   columns={filteredColumns}
                   onRequestPurchase={(col) => requireName(() => setSelectedColumn(col))}
                   onRowClick={setDetailColumn}
+                  usageMap={usageMap}
                 />
               )}
             </div>
