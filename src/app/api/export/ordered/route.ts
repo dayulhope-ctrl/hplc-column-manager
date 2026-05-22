@@ -16,10 +16,27 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
 
+    const modelIds = (data || []).map((r: any) => r.column_model_id);
+    const { data: usageData } = await sb
+      .from('individual_columns')
+      .select('model_id, product_name')
+      .in('model_id', modelIds)
+      .not('product_name', 'is', null)
+      .neq('product_name', '');
+
+    const usageMap: Record<string, string[]> = {};
+    (usageData || []).forEach((r: any) => {
+      if (!usageMap[r.model_id]) usageMap[r.model_id] = [];
+      if (!usageMap[r.model_id].includes(r.product_name))
+        usageMap[r.model_id].push(r.product_name);
+    });
+
     const rows = (data || []).map(r => {
       const col = r.column_models as any;
       const unitPrice = col?.unit_price ?? 0;
       const total = unitPrice * r.quantity;
+      const products = usageMap[r.column_model_id];
+      const usage = products?.length ? products.join(', ') : (r.reason ?? '');
       return [
         col?.model_name ?? '',
         col?.cat_no ?? '',
@@ -28,7 +45,7 @@ export async function GET(req: NextRequest) {
         r.quantity,
         unitPrice,
         total,
-        r.reason ?? '',
+        usage,
       ];
     });
 
@@ -36,7 +53,7 @@ export async function GET(req: NextRequest) {
     const totalAmt = rows.reduce((s, r) => s + (r[6] as number), 0);
     const totalRow = ['합계', '', '', '', totalQty, '', totalAmt, ''];
 
-    const header = ['모델명', 'Cat. No', 'KEP 코드', '사이즈', '수량', '단가(원)', '예상총액(원)', '구매사유'];
+    const header = ['모델명', 'Cat. No', 'KEP 코드', '사이즈', '수량', '단가(원)', '예상총액(원)', '구매용도'];
 
     return buildXlsxResponse([[header, ...rows, totalRow]], ['입고대기'], '입고대기목록');
   } catch (e: any) {
