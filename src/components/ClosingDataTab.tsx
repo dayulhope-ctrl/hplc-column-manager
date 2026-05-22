@@ -222,12 +222,13 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
                 <th className="px-4 py-2 text-left">마감일</th>
                 <th className="px-4 py-2 text-left">담당자</th>
                 <th className="px-4 py-2 text-center">상세</th>
+                <th className="px-4 py-2 text-center">엑셀</th>
                 {isAdmin && <th className="px-4 py-2 text-center">삭제</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {closings.length === 0 ? (
-                <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 py-8 text-center text-gray-400">마감 이력이 없습니다</td></tr>
+                <tr><td colSpan={isAdmin ? 9 : 8} className="px-4 py-8 text-center text-gray-400">마감 이력이 없습니다</td></tr>
               ) : closings.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2 font-medium">{c.month}</td>
@@ -239,6 +240,12 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
                   <td className="px-4 py-2 text-center">
                     <button onClick={() => setSelectedClosing(c)}
                       className="px-2 py-0.5 border rounded text-xs hover:bg-gray-100">보기</button>
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    <a href={`/api/export/closings/${c.month}`} download
+                      className="px-2 py-0.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 inline-flex items-center gap-0.5">
+                      <Download className="w-3 h-3" /> 엑셀
+                    </a>
                   </td>
                   {isAdmin && (
                     <td className="px-4 py-2 text-center">
