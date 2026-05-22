@@ -17,18 +17,15 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
 
     const modelIds = (data || []).map((r: any) => r.column_model_id);
-    const { data: usageData } = await sb
-      .from('individual_columns')
-      .select('model_id, product_name')
-      .in('model_id', modelIds)
-      .not('product_name', 'is', null)
-      .neq('product_name', '');
+    const { data: modelData } = await sb
+      .from('column_models')
+      .select('id, products_used')
+      .in('id', modelIds);
 
     const usageMap: Record<string, string[]> = {};
-    (usageData || []).forEach((r: any) => {
-      if (!usageMap[r.model_id]) usageMap[r.model_id] = [];
-      if (!usageMap[r.model_id].includes(r.product_name))
-        usageMap[r.model_id].push(r.product_name);
+    (modelData || []).forEach((r: any) => {
+      if (Array.isArray(r.products_used) && r.products_used.length)
+        usageMap[r.id] = r.products_used;
     });
 
     const rows = (data || []).map(r => {
