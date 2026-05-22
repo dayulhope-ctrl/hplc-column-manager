@@ -7,7 +7,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const admin = await requireAdmin();
     const body = await req.json();
-    const { action, notes } = body;
+    const { action, notes, unit_price, receiving_date } = body;
 
     if (!['approve', 'reject', 'order', 'receive'].includes(action)) {
       return NextResponse.json({ error: '잘못된 액션' }, { status: 400 });
@@ -53,6 +53,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       updateData.received_at = new Date().toISOString();
 
       const col = request.column_models;
+      const finalUnitPrice = unit_price ?? col?.unit_price ?? 0;
+      const finalReceivingDate = receiving_date ?? new Date().toISOString().split('T')[0];
 
       // 재고 원자적 증가 (RPC 사용 - race condition 방지)
       const { error: rpcError } = await sb.rpc('increment_column_stock', {
@@ -82,9 +84,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         size: col?.size,
         particle_size: col?.particle_size,
         quantity: request.quantity,
-        unit_price: col?.unit_price,
-        total_price: (col?.unit_price || 0) * request.quantity,
-        receiving_date: new Date().toISOString().split('T')[0],
+        unit_price: finalUnitPrice,
+        total_price: finalUnitPrice * request.quantity,
+        receiving_date: finalReceivingDate,
         received_by: admin.username,
       });
     }

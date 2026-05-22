@@ -310,12 +310,23 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
 
         {/* 장바구니 탭 */}
         <div className={tab !== 'cart' ? 'hidden' : ''}>
-          <CartTab columns={columns} isAdmin={false} />
+          <CartTab
+            columns={columns}
+            approvedRequests={requests.filter(r => r.status === 'approved')}
+            isAdmin={false}
+            onOrderCompleted={fetchData}
+          />
         </div>
 
         {/* 입고 확인 탭 */}
         {tab === 'receiving' && (
-          <ReceivingsPanel receivings={receivings} closings={closings} onRefresh={fetchData} isAdmin={false} />
+          <ReceivingsPanel
+            orderedRequests={requests.filter(r => r.status === 'ordered')}
+            receivings={receivings}
+            closings={closings}
+            onRefresh={fetchData}
+            isAdmin={false}
+          />
         )}
 
         {/* 마감자료 탭 */}

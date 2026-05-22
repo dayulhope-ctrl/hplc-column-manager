@@ -95,6 +95,7 @@ export default function AdminClient({ adminName, username }: Props) {
   }, [columns, search, filter]);
 
   const pendingRequests = requests.filter(r => r.status === 'pending');
+  const orderedRequests = requests.filter(r => r.status === 'ordered');
 
   const handleRequestAction = async (id: string, action: 'approve' | 'reject' | 'order' | 'receive', notes?: string) => {
     const res = await fetch(`/api/requests/${id}`, {
@@ -160,7 +161,7 @@ export default function AdminClient({ adminName, username }: Props) {
             { key: 'dashboard', label: '대시보드', icon: Package },
             { key: 'requests', label: '구매 요청', icon: ClipboardList, badge: pendingRequests.length },
             { key: 'cart', label: '장바구니', icon: ShoppingCart },
-            { key: 'receiving', label: '입고 확인', icon: CheckCircle },
+            { key: 'receiving', label: '입고 확인', icon: CheckCircle, badge: orderedRequests.length },
             { key: 'closing_data', label: '마감자료', icon: FileText },
             { key: 'purchase_history', label: '총 구매내역', icon: BarChart2 },
             { key: 'columns', label: '칼럼 이력', icon: History },
@@ -265,7 +266,12 @@ export default function AdminClient({ adminName, username }: Props) {
 
         {/* 장바구니 - 탭 이동 시 상태 유지를 위해 항상 마운트 */}
         <div className={tab !== 'cart' ? 'hidden' : ''}>
-          <CartTab columns={columns} adminName={adminName || username} onRequestCreated={fetchData} />
+          <CartTab
+            columns={columns}
+            approvedRequests={requests.filter(r => r.status === 'approved')}
+            adminName={adminName || username}
+            onOrderCompleted={fetchData}
+          />
         </div>
 
         {/* 구매 요청 관리 */}
@@ -275,7 +281,14 @@ export default function AdminClient({ adminName, username }: Props) {
 
         {/* 입고 확인 */}
         {tab === 'receiving' && (
-          <ReceivingsPanel receivings={receivings} closings={closings} onRefresh={fetchData} isAdmin />
+          <ReceivingsPanel
+            orderedRequests={requests.filter(r => r.status === 'ordered')}
+            receivings={receivings}
+            closings={closings}
+            onRefresh={fetchData}
+            adminName={adminName || username}
+            isAdmin
+          />
         )}
 
         {/* 마감자료 */}

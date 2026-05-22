@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ShoppingCart, Plus, Minus, Search, Send } from 'lucide-react';
-import { ColumnModel } from '@/types';
+import { ShoppingCart, Plus, Search, Send, PackageCheck, Truck } from 'lucide-react';
+import { ColumnModel, PurchaseRequest } from '@/types';
 
+// ── 섹션 B: 재고부족 칼럼 장바구니 ──
 interface CartItem {
   column: ColumnModel;
   quantity: number;
@@ -14,8 +15,9 @@ interface CartItem {
 
 interface Props {
   columns: ColumnModel[];
+  approvedRequests: PurchaseRequest[];   // 섹션 A: 승인된 구매요청
   adminName?: string;
-  onRequestCreated?: () => void;
+  onOrderCompleted?: () => void;
   isAdmin?: boolean;
 }
 
@@ -38,13 +40,18 @@ function makeItem(col: ColumnModel): CartItem {
   };
 }
 
-export default function CartTab({ columns, adminName, onRequestCreated, isAdmin = true }: Props) {
+export default function CartTab({ columns, approvedRequests, adminName, onOrderCompleted, isAdmin = true }: Props) {
+  // ── 섹션 B 상태 ──
   const [cart, setCart] = useState<CartItem[]>([]);
   const [initialized, setInitialized] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // ── 공통 상태 ──
+  const [submittingA, setSubmittingA] = useState<Set<string>>(new Set());
+  const [submittingB, setSubmittingB] = useState(false);
+  const [checkedB, setCheckedB] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (message) {
@@ -53,21 +60,17 @@ export default function CartTab({ columns, adminName, onRequestCreated, isAdmin 
     }
   }, [message]);
 
-  // 장바구니 변경 시 localStorage에 저장
+  // localStorage 저장
   useEffect(() => {
     if (!initialized) return;
-    const data = cart.map(i => ({
-      id: i.column.id, qty: i.quantity, reason: i.reason, urgency: i.urgency,
-    }));
+    const data = cart.map(i => ({ id: i.column.id, qty: i.quantity, reason: i.reason, urgency: i.urgency }));
     localStorage.setItem(CART_KEY, JSON.stringify(data));
   }, [cart, initialized]);
 
-  // 초기화: localStorage 복원 → 새 재고 0 항목 병합
+  // 초기화: localStorage 복원 + 재고 0 항목 병합
   useEffect(() => {
     if (columns.length === 0) return;
-
     if (initialized) {
-      // 이미 초기화됨 → 새로 재고 0이 된 항목만 추가
       setCart(prev => {
         const ids = new Set(prev.map(i => i.column.id));
         const newItems = columns.filter(c => c.total_stock === 0 && !ids.has(c.id)).map(makeItem);
@@ -75,12 +78,9 @@ export default function CartTab({ columns, adminName, onRequestCreated, isAdmin 
       });
       return;
     }
-
-    // 첫 초기화: localStorage에서 복원
     const saved = localStorage.getItem(CART_KEY);
     const restored: CartItem[] = [];
     const savedIds = new Set<string>();
-
     if (saved) {
       try {
         const items: { id: string; qty: number; reason: string; urgency: any }[] = JSON.parse(saved);
@@ -91,49 +91,69 @@ export default function CartTab({ columns, adminName, onRequestCreated, isAdmin 
             savedIds.add(item.id);
           }
         }
-      } catch { /* 파싱 실패 시 무시 */ }
+      } catch { /* 파싱 실패 무시 */ }
     }
-
-    // localStorage에 없는 재고 0 항목 추가
     const newItems = columns.filter(c => c.total_stock === 0 && !savedIds.has(c.id)).map(makeItem);
     setCart([...restored, ...newItems]);
     setInitialized(true);
   }, [columns]);
 
-  const allChecked = cart.length > 0 && cart.every(i => i.checked);
-  const checkedCount = cart.filter(i => i.checked).length;
-
-  const toggleAll = () => setCart(prev => prev.map(i => ({ ...i, checked: !allChecked })));
-  const toggleItem = (id: string) => setCart(prev => prev.map(i => i.column.id === id ? { ...i, checked: !i.checked } : i));
-
-  const addToCart = (col: ColumnModel) => {
-    if (cart.some(item => item.column.id === col.id)) return;
-    setCart(prev => [...prev, {
-      column: col, quantity: Math.max(1, col.min_safety_stock || 1),
-      reason: '', urgency: 'normal', checked: false,
-    }]);
-    setShowAddModal(false);
-    setSearchQuery('');
+  // ── 섹션 A: 승인된 요청 → 발주 ──
+  const handleOrderApproved = async (requestId: string) => {
+    if (!confirm('이 항목을 발주 완료 처리하시겠습니까?')) return;
+    setSubmittingA(prev => new Set(prev).add(requestId));
+    try {
+      const res = await fetch(`/api/requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'order' }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setMessage({ type: 'success', text: '발주 완료 처리되었습니다' });
+      onOrderCompleted?.();
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message });
+    } finally {
+      setSubmittingA(prev => { const s = new Set(prev); s.delete(requestId); return s; });
+    }
   };
 
-  const removeChecked = () => {
-    if (checkedCount === 0) return;
-    if (!confirm(`선택한 ${checkedCount}개 항목을 장바구니에서 삭제하시겠습니까?`)) return;
-    setCart(prev => prev.filter(i => !i.checked));
+  const handleOrderAllApproved = async () => {
+    if (approvedRequests.length === 0) return;
+    if (!confirm(`승인된 구매요청 ${approvedRequests.length}건을 모두 발주 완료 처리하시겠습니까?`)) return;
+    setSubmittingA(new Set(approvedRequests.map(r => r.id)));
+    try {
+      await Promise.all(approvedRequests.map(r =>
+        fetch(`/api/requests/${r.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'order' }),
+        })
+      ));
+      setMessage({ type: 'success', text: `${approvedRequests.length}건 발주 완료 처리되었습니다` });
+      onOrderCompleted?.();
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message });
+    } finally {
+      setSubmittingA(new Set());
+    }
   };
 
-  const updateQty = (id: string, delta: number) => {
-    setCart(prev => prev.map(i =>
-      i.column.id === id ? { ...i, quantity: Math.max(1, i.quantity + delta) } : i
-    ));
+  // ── 섹션 B: 재고부족 칼럼 → 직접 발주 ──
+  const allCheckedB = cart.length > 0 && cart.every(i => checkedB.has(i.column.id));
+  const toggleAllB = () => {
+    if (allCheckedB) setCheckedB(new Set());
+    else setCheckedB(new Set(cart.map(i => i.column.id)));
+  };
+  const toggleItemB = (id: string) => {
+    setCheckedB(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   };
 
-  const handleSubmit = async () => {
-    const targets = checkedCount > 0 ? cart.filter(i => i.checked) : cart;
+  const handleDirectOrder = async () => {
+    const targets = checkedB.size > 0 ? cart.filter(i => checkedB.has(i.column.id)) : cart;
     if (targets.length === 0) return;
-    if (!confirm(`${targets.length}건의 구매 요청을 생성하시겠습니까?`)) return;
-    setSubmitting(true);
-
+    if (!confirm(`재고부족 칼럼 ${targets.length}건을 직접 발주 처리하시겠습니까?`)) return;
+    setSubmittingB(true);
     const results = await Promise.all(
       targets.map(item =>
         fetch('/api/requests', {
@@ -142,23 +162,36 @@ export default function CartTab({ columns, adminName, onRequestCreated, isAdmin 
           body: JSON.stringify({
             column_model_id: item.column.id,
             quantity: item.quantity,
-            reason: item.reason || null,
+            reason: item.reason || '재고 소진 직접 발주',
             urgency: item.urgency,
+            initial_status: 'ordered',   // 관리자 직접 발주
+            requester_name: adminName,
           }),
         })
       )
     );
-
     const failCount = results.filter(r => !r.ok).length;
-    setSubmitting(false);
-
+    setSubmittingB(false);
     if (failCount === 0) {
-      setMessage({ type: 'success', text: `${targets.length}건 구매 요청 완료` });
+      setMessage({ type: 'success', text: `${targets.length}건 발주 완료 처리되었습니다` });
       setCart(prev => prev.filter(i => !targets.some(t => t.column.id === i.column.id)));
-      onRequestCreated?.();
+      setCheckedB(new Set());
+      onOrderCompleted?.();
     } else {
-      setMessage({ type: 'error', text: `${failCount}건 요청 생성 실패` });
+      setMessage({ type: 'error', text: `${failCount}건 처리 실패` });
     }
+  };
+
+  const updateQty = (id: string, delta: number) =>
+    setCart(prev => prev.map(i => i.column.id === id ? { ...i, quantity: Math.max(1, i.quantity + delta) } : i));
+
+  const removeFromCart = (id: string) => setCart(prev => prev.filter(i => i.column.id !== id));
+
+  const addToCart = (col: ColumnModel) => {
+    if (cart.some(item => item.column.id === col.id)) return;
+    setCart(prev => [...prev, { column: col, quantity: Math.max(1, col.min_safety_stock || 1), reason: '', urgency: 'normal', checked: false }]);
+    setShowAddModal(false);
+    setSearchQuery('');
   };
 
   const availableToAdd = columns.filter(col =>
@@ -168,23 +201,16 @@ export default function CartTab({ columns, adminName, onRequestCreated, isAdmin 
       col.cat_no.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const totalEstimate = cart.reduce((sum, item) => sum + item.quantity * item.column.unit_price, 0);
+  const totalEstimateB = cart.reduce((sum, item) => sum + item.quantity * item.column.unit_price, 0);
+  const checkedCountB = checkedB.size;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
           <ShoppingCart className="w-5 h-5" />
-          장바구니 관리
+          장바구니
         </h2>
-        {isAdmin && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 text-sm"
-          >
-            <Plus className="w-4 h-4" /> 수동 추가
-          </button>
-        )}
       </div>
 
       {message && (
@@ -193,145 +219,188 @@ export default function CartTab({ columns, adminName, onRequestCreated, isAdmin 
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {/* 자동 장바구니 헤더 */}
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
+      {/* ── 섹션 A: 승인된 구매요청 ── */}
+      <div className="bg-white rounded-xl border border-blue-200 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-blue-50 border-b border-blue-100">
           <div className="flex items-center gap-2">
-            <ShoppingCart className="w-4 h-4 text-gray-500" />
-            <span className="font-medium text-sm">자동 장바구니</span>
-            <span className="text-xs text-gray-500">재고 0인 칼럼이 자동으로 추가됩니다</span>
+            <PackageCheck className="w-4 h-4 text-blue-600" />
+            <span className="font-semibold text-sm text-blue-900">승인된 구매요청</span>
+            <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">{approvedRequests.length}건</span>
           </div>
-          <span className="text-sm font-medium text-gray-700">{cart.length}개 항목</span>
+          {isAdmin && approvedRequests.length > 0 && (
+            <button
+              onClick={handleOrderAllApproved}
+              disabled={submittingA.size > 0}
+              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5" />
+              전체 발주완료
+            </button>
+          )}
         </div>
 
-        {cart.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">
-            <ShoppingCart className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-            <p>재고 0개 칼럼이 없습니다</p>
+        {approvedRequests.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 text-sm">
+            <PackageCheck className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+            승인된 구매요청이 없습니다
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs text-gray-600 border-b">
                 <tr>
-                  {isAdmin && (
-                    <th className="px-3 py-2 text-center w-10">
-                      <input type="checkbox" checked={allChecked} onChange={toggleAll} className="rounded" />
-                    </th>
-                  )}
-                  <th className="px-3 py-2 text-left">모델명</th>
-                  <th className="px-3 py-2 text-left">Cat. No</th>
-                  <th className="px-3 py-2 text-left">KEP 코드</th>
-                  <th className="px-3 py-2 text-center">구매수량</th>
-                  <th className="px-3 py-2 text-right">단가</th>
-                  <th className="px-3 py-2 text-right">합계</th>
-                  <th className="px-3 py-2 text-center">상태</th>
-                  <th className="px-3 py-2 text-left">긴급도</th>
+                  <th className="px-4 py-2 text-left">요청일</th>
+                  <th className="px-4 py-2 text-left">요청자</th>
+                  <th className="px-4 py-2 text-left">모델명</th>
+                  <th className="px-4 py-2 text-left">Cat. No</th>
+                  <th className="px-4 py-2 text-center">수량</th>
+                  <th className="px-4 py-2 text-left">사유</th>
+                  {isAdmin && <th className="px-4 py-2 text-center">발주</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {cart.map(item => (
-                  <tr key={item.column.id} className={`hover:bg-gray-50 ${item.checked ? 'bg-blue-50' : ''}`}>
+                {approvedRequests.map(req => (
+                  <tr key={req.id} className="hover:bg-blue-50/50">
+                    <td className="px-4 py-2 text-xs text-gray-500">{new Date(req.created_at).toLocaleDateString('ko-KR')}</td>
+                    <td className="px-4 py-2 text-xs font-medium">{req.requested_by}</td>
+                    <td className="px-4 py-2 font-medium text-gray-900">{req.column_models?.model_name}</td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-500">{req.column_models?.cat_no}</td>
+                    <td className="px-4 py-2 text-center font-semibold">{req.quantity}</td>
+                    <td className="px-4 py-2 text-xs text-gray-500">{req.reason || '-'}</td>
                     {isAdmin && (
-                      <td className="px-3 py-2 text-center">
-                        <input type="checkbox" checked={item.checked} onChange={() => toggleItem(item.column.id)} className="rounded" />
+                      <td className="px-4 py-2 text-center">
+                        <button
+                          onClick={() => handleOrderApproved(req.id)}
+                          disabled={submittingA.has(req.id)}
+                          className="px-2.5 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1 mx-auto"
+                        >
+                          <Send className="w-3 h-3" />
+                          발주완료
+                        </button>
                       </td>
                     )}
-                    <td className="px-3 py-2 font-medium text-gray-900">{item.column.model_name}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-gray-600">{item.column.cat_no}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-gray-600">{item.column.kep_code || '-'}</td>
-                    <td className="px-3 py-2">
-                      {isAdmin ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => updateQty(item.column.id, -1)}
-                            className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100 text-xs">－</button>
-                          <span className="w-8 text-center font-semibold">{item.quantity}</span>
-                          <button onClick={() => updateQty(item.column.id, 1)}
-                            className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100 text-xs">＋</button>
-                        </div>
-                      ) : (
-                        <span className="block text-center font-semibold">{item.quantity}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-700">₩{item.column.unit_price.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-blue-700">
-                      ₩{(item.quantity * item.column.unit_price).toLocaleString()}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
-                        재고 {item.column.total_stock}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      {isAdmin ? (
-                        <select value={item.urgency}
-                          onChange={e => setCart(prev => prev.map(i => i.column.id === item.column.id ? { ...i, urgency: e.target.value as any } : i))}
-                          className="px-1.5 py-0.5 border rounded text-xs bg-white">
-                          {URGENCY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
-                      ) : (
-                        <span className="text-xs text-gray-600">
-                          {URGENCY_OPTIONS.find(o => o.value === item.urgency)?.label || item.urgency}
-                        </span>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-
-        {/* 하단 액션 바 */}
-        {cart.length > 0 && isAdmin && (
-          <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600">{checkedCount}개 항목 선택됨</span>
-              <button
-                onClick={removeChecked}
-                disabled={checkedCount === 0}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-40"
-              >
-                장바구니 삭제 ({checkedCount})
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600 font-medium">
-                예상 합계: <span className="text-blue-700 font-bold">₩{totalEstimate.toLocaleString()}</span>
-              </span>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || cart.length === 0}
-                className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5 text-sm font-semibold"
-              >
-                <Send className="w-4 h-4" />
-                {submitting ? '요청 중...' : `발주 완료 (${checkedCount > 0 ? checkedCount : cart.length})`}
-              </button>
-            </div>
-          </div>
-        )}
-        {/* 읽기 전용 합계 표시 */}
-        {cart.length > 0 && !isAdmin && (
-          <div className="flex items-center justify-end px-4 py-3 border-t bg-gray-50">
-            <span className="text-sm text-gray-600 font-medium">
-              예상 합계: <span className="text-blue-700 font-bold">₩{totalEstimate.toLocaleString()}</span>
-            </span>
-          </div>
-        )}
       </div>
 
-      {/* 구매 진행 현황 */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: '요청 대기', value: 0, color: 'text-amber-600' },
-          { label: '승인 대기', value: 0, color: 'text-blue-600' },
-          { label: '발주 완료', value: 0, color: 'text-green-600' },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-            <p className="text-xs text-gray-500 mb-1">{s.label}</p>
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+      {/* ── 섹션 B: 재고부족 칼럼 직접 발주 ── */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
+          <div className="flex items-center gap-2">
+            <Truck className="w-4 h-4 text-gray-500" />
+            <span className="font-semibold text-sm text-gray-800">재고부족 직접 발주</span>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{cart.length}건</span>
+            <span className="text-xs text-gray-400">(재고 0 칼럼 자동 추가)</span>
           </div>
-        ))}
+          {isAdmin && (
+            <button onClick={() => setShowAddModal(true)}
+              className="px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-800 flex items-center gap-1.5 text-sm">
+              <Plus className="w-4 h-4" /> 수동 추가
+            </button>
+          )}
+        </div>
+
+        {cart.length === 0 ? (
+          <div className="p-10 text-center text-gray-400 text-sm">
+            <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+            재고 0개 칼럼이 없습니다
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-xs text-gray-600 border-b">
+                  <tr>
+                    {isAdmin && (
+                      <th className="px-3 py-2 text-center w-10">
+                        <input type="checkbox" checked={allCheckedB} onChange={toggleAllB} className="rounded" />
+                      </th>
+                    )}
+                    <th className="px-3 py-2 text-left">모델명</th>
+                    <th className="px-3 py-2 text-left">Cat. No</th>
+                    <th className="px-3 py-2 text-left">KEP 코드</th>
+                    <th className="px-3 py-2 text-center">구매수량</th>
+                    <th className="px-3 py-2 text-right">단가</th>
+                    <th className="px-3 py-2 text-right">합계</th>
+                    <th className="px-3 py-2 text-center">재고</th>
+                    <th className="px-3 py-2 text-left">긴급도</th>
+                    {isAdmin && <th className="px-3 py-2 text-center">삭제</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {cart.map(item => (
+                    <tr key={item.column.id} className={`hover:bg-gray-50 ${checkedB.has(item.column.id) ? 'bg-amber-50' : ''}`}>
+                      {isAdmin && (
+                        <td className="px-3 py-2 text-center">
+                          <input type="checkbox" checked={checkedB.has(item.column.id)} onChange={() => toggleItemB(item.column.id)} className="rounded" />
+                        </td>
+                      )}
+                      <td className="px-3 py-2 font-medium text-gray-900">{item.column.model_name}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-gray-600">{item.column.cat_no}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-gray-600">{item.column.kep_code || '-'}</td>
+                      <td className="px-3 py-2">
+                        {isAdmin ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => updateQty(item.column.id, -1)} className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100 text-xs">－</button>
+                            <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                            <button onClick={() => updateQty(item.column.id, 1)} className="w-6 h-6 rounded border flex items-center justify-center hover:bg-gray-100 text-xs">＋</button>
+                          </div>
+                        ) : (
+                          <span className="block text-center font-semibold">{item.quantity}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">₩{item.column.unit_price.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-blue-700">₩{(item.quantity * item.column.unit_price).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">재고 {item.column.total_stock}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {isAdmin ? (
+                          <select value={item.urgency}
+                            onChange={e => setCart(prev => prev.map(i => i.column.id === item.column.id ? { ...i, urgency: e.target.value as any } : i))}
+                            className="px-1.5 py-0.5 border rounded text-xs bg-white">
+                            {URGENCY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                        ) : (
+                          <span className="text-xs text-gray-600">{URGENCY_OPTIONS.find(o => o.value === item.urgency)?.label}</span>
+                        )}
+                      </td>
+                      {isAdmin && (
+                        <td className="px-3 py-2 text-center">
+                          <button onClick={() => removeFromCart(item.column.id)} className="text-xs text-red-400 hover:text-red-600 px-1.5 py-0.5 hover:bg-red-50 rounded">삭제</button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {isAdmin && (
+              <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600">{checkedCountB > 0 ? `${checkedCountB}개 선택됨` : `전체 ${cart.length}개`}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-gray-600">
+                    예상 합계: <span className="text-blue-700 font-bold">₩{totalEstimateB.toLocaleString()}</span>
+                  </span>
+                  <button
+                    onClick={handleDirectOrder}
+                    disabled={submittingB}
+                    className="px-4 py-1.5 bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-50 flex items-center gap-1.5 text-sm font-semibold"
+                  >
+                    <Send className="w-4 h-4" />
+                    {submittingB ? '처리 중...' : `발주완료 (${checkedCountB > 0 ? checkedCountB : cart.length})`}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* 칼럼 추가 모달 */}
@@ -355,7 +424,7 @@ export default function CartTab({ columns, adminName, onRequestCreated, isAdmin 
                 <p className="text-center text-gray-400 py-8 text-sm">검색 결과가 없습니다</p>
               ) : availableToAdd.map(col => (
                 <button key={col.id} onClick={() => addToCart(col)}
-                  className="w-full text-left p-3 hover:bg-blue-50 rounded-lg flex items-center justify-between group">
+                  className="w-full text-left p-3 hover:bg-blue-50 rounded-lg flex items-center justify-between">
                   <div>
                     <div className="font-medium text-sm">{col.model_name}</div>
                     <div className="text-xs text-gray-500 font-mono">{col.cat_no}</div>

@@ -18,8 +18,8 @@ export default function RequestsPanel({
 }: Props) {
   const [showAdd, setShowAdd] = useState(false);
 
-  const active = requests.filter(r => !['received', 'rejected'].includes(r.status));
-  const completed = requests.filter(r => r.status === 'received');
+  // 구매요청 탭: pending/approved만 표시 (ordered/received는 각각 장바구니/입고확인 탭에서 처리)
+  const active = requests.filter(r => ['pending', 'approved'].includes(r.status));
   const rejected = requests.filter(r => r.status === 'rejected');
 
   const handleDelete = async (id: string) => {
@@ -75,12 +75,7 @@ export default function RequestsPanel({
                             </>
                           )}
                           {req.status === 'approved' && (
-                            <button onClick={() => onAction(req.id, 'order')}
-                              className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700">발주</button>
-                          )}
-                          {req.status === 'ordered' && (
-                            <button onClick={() => onAction(req.id, 'receive')}
-                              className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">입고처리</button>
+                            <span className="text-xs text-blue-600 font-medium">→ 장바구니 대기</span>
                           )}
                         </>
                       )}
@@ -123,22 +118,13 @@ export default function RequestsPanel({
         </div>
       </div>
 
-      {/* 구매 진행 중 */}
+      {/* 구매 요청 목록 (pending + approved) */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
           구매요청 목록 ({active.length})
         </h3>
         <RequestTable rows={active} showActions={isAdmin} />
-      </div>
-
-      {/* 구매완료 */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-          구매완료 목록 ({completed.length})
-        </h3>
-        <RequestTable rows={completed} />
       </div>
 
       {/* 거부됨 */}

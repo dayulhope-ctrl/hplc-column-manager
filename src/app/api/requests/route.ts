@@ -83,6 +83,10 @@ export async function POST(req: NextRequest) {
       ? (session as any).department
       : null;
 
+    // 관리자가 장바구니에서 직접 발주하는 경우 → 'ordered' 상태로 바로 생성
+    const isAdmin = session?.type === 'admin';
+    const initialStatus = (isAdmin && body.initial_status === 'ordered') ? 'ordered' : 'pending';
+
     const { data, error } = await sb
       .from('purchase_requests')
       .insert({
@@ -92,17 +96,31 @@ export async function POST(req: NextRequest) {
         quantity: body.quantity,
         reason: body.reason || null,
         urgency: body.urgency || 'normal',
-        status: 'pending',
+        status: initialStatus,
+        ...(initialStatus === 'ordered' ? {
+          reviewed_by: (session as any)?.username,
+          reviewed_at: new Date().toISOString(),
+          ordered_at: new Date().toISOString(),
+        } : {}),
       })
       .select('*, column_models(*)')
       .single();
 
     if (error) throw error;
 
+    // 발주 상태로 생성 시 칼럼 purchase_status 업데이트
+    if (initialStatus === 'ordered') {
+      await sb.from('column_models').update({
+        purchase_status: '발주 완료',
+        purchase_quantity: body.quantity,
+        order_date: new Date().toISOString().split('T')[0],
+      }).eq('id', columnModelId);
+    }
+
     await sb.from('activity_logs').insert({
       actor: requestedBy,
       actor_type: session?.type ?? 'guest',
-      action: 'create_purchase_request',
+      action: initialStatus === 'ordered' ? 'direct_order' : 'create_purchase_request',
       target_type: 'purchase_request',
       target_id: data.id,
       details: {
