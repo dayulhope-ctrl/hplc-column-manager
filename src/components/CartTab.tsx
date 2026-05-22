@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ShoppingCart, Plus, Search, Send, PackageCheck, Truck } from 'lucide-react';
+import { ShoppingCart, Plus, Search, Send, PackageCheck, Truck, Trash2 } from 'lucide-react';
 import { ColumnModel, PurchaseRequest } from '@/types';
 
 // ── 섹션 B: 재고부족 칼럼 장바구니 ──
@@ -73,7 +73,7 @@ export default function CartTab({ columns, approvedRequests, adminName, onOrderC
     if (initialized) {
       setCart(prev => {
         const ids = new Set(prev.map(i => i.column.id));
-        const newItems = columns.filter(c => c.total_stock === 0 && !ids.has(c.id)).map(makeItem);
+        const newItems = columns.filter(c => c.total_stock === 0 && !ids.has(c.id) && c.purchase_status !== '발주 완료').map(makeItem);
         return newItems.length > 0 ? [...prev, ...newItems] : prev;
       });
       return;
@@ -93,10 +93,23 @@ export default function CartTab({ columns, approvedRequests, adminName, onOrderC
         }
       } catch { /* 파싱 실패 무시 */ }
     }
-    const newItems = columns.filter(c => c.total_stock === 0 && !savedIds.has(c.id)).map(makeItem);
+    const newItems = columns.filter(c => c.total_stock === 0 && !savedIds.has(c.id) && c.purchase_status !== '발주 완료').map(makeItem);
     setCart([...restored, ...newItems]);
     setInitialized(true);
   }, [columns]);
+
+  // ── 섹션 A: 승인된 요청 삭제 ──
+  const handleDeleteApproved = async (id: string) => {
+    if (!confirm('이 구매 요청을 삭제하시겠습니까?')) return;
+    try {
+      const res = await fetch(`/api/requests/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setMessage({ type: 'success', text: '구매 요청이 삭제되었습니다' });
+      onOrderCompleted?.();
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message || '삭제 실패' });
+    }
+  };
 
   // ── 섹션 A: 승인된 요청 → 발주 ──
   const handleOrderApproved = async (requestId: string) => {
@@ -256,6 +269,7 @@ export default function CartTab({ columns, approvedRequests, adminName, onOrderC
                   <th className="px-4 py-2 text-center">수량</th>
                   <th className="px-4 py-2 text-left">사유</th>
                   {isAdmin && <th className="px-4 py-2 text-center">발주</th>}
+                  {isAdmin && <th className="px-4 py-2 text-center">삭제</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -276,6 +290,17 @@ export default function CartTab({ columns, approvedRequests, adminName, onOrderC
                         >
                           <Send className="w-3 h-3" />
                           발주완료
+                        </button>
+                      </td>
+                    )}
+                    {isAdmin && (
+                      <td className="px-4 py-2 text-center">
+                        <button
+                          onClick={() => handleDeleteApproved(req.id)}
+                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="삭제"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     )}
