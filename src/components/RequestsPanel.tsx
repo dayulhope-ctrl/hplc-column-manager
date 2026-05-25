@@ -39,12 +39,20 @@ export default function RequestsPanel({
   const [showCompleted, setShowCompleted] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
 
-  const pending  = requests.filter(r => r.status === 'pending');
-  const inProgress = requests.filter(r => ['approved', 'ordered'].includes(r.status));
-  const completed = requests.filter(r => r.status === 'received');
-  const rejected  = requests.filter(r => r.status === 'rejected');
+  // 관리자 직접 발주(is_admin_direct=true)는 구매요청 탭에서 완전히 제외
+  // → 해당 항목은 입고확인 탭에서만 관리
+  const teamRequests = requests.filter(r => !r.is_admin_direct);
 
-  const handleDelete = async (id: string) => {
+  const pending    = teamRequests.filter(r => r.status === 'pending');
+  const inProgress = teamRequests.filter(r => ['approved', 'ordered'].includes(r.status));
+  const completed  = teamRequests.filter(r => r.status === 'received');
+  const rejected   = teamRequests.filter(r => r.status === 'rejected');
+
+  const handleDelete = async (id: string, status: string) => {
+    if (['ordered', 'received'].includes(status)) {
+      alert('발주/입고 처리된 항목은 구매요청에서 삭제할 수 없습니다.\n입고확인 탭에서 발주취소를 이용하세요.');
+      return;
+    }
     if (!confirm('이 구매 요청을 삭제하시겠습니까?')) return;
     const res = await fetch(`/api/requests/${id}`, { method: 'DELETE' });
     if (res.ok) onRefresh();
@@ -116,15 +124,18 @@ export default function RequestsPanel({
                           >거부</button>
                         </>
                       )}
-                      {showDeleteBtn && (
-                        <button
-                          onClick={() => handleDelete(req.id)}
-                          className="p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600"
-                          title="삭제"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      {showDeleteBtn && (() => {
+                        const isLocked = ['ordered', 'received'].includes(req.status);
+                        return (
+                          <button
+                            onClick={() => handleDelete(req.id, req.status)}
+                            className={`p-1 rounded ${isLocked ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-red-50 text-red-400 hover:text-red-600'}`}
+                            title={isLocked ? '발주/입고 완료 항목은 입고확인 탭에서 처리하세요' : '삭제'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        );
+                      })()}
                     </div>
                   </td>
                 )}
@@ -177,7 +188,7 @@ export default function RequestsPanel({
             <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
             진행 중
             <span className="text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{inProgress.length}건</span>
-            <span className="text-xs text-gray-400 ml-1">— 장바구니 대기 또는 결제 완료된 항목</span>
+            <span className="text-xs text-gray-400 ml-1">— 승인 후 장바구니 대기 또는 결제 완료 (취소는 입고확인 탭 사용)</span>
           </h3>
           <RequestTable rows={inProgress} showApproveBtn={false} showDeleteBtn={isAdmin} />
         </div>

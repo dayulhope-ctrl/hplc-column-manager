@@ -64,6 +64,7 @@ export interface PurchaseRequest {
   review_notes: string | null;
   ordered_at: string | null;
   received_at: string | null;
+  is_admin_direct: boolean;
   created_at: string;
   updated_at: string;
   // Join

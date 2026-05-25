@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
         reason: body.reason || null,
         urgency: body.urgency || 'normal',
         status: initialStatus,
+        is_admin_direct: initialStatus === 'ordered',
         ...(initialStatus === 'ordered' ? {
           reviewed_by: (session as any)?.username,
           reviewed_at: new Date().toISOString(),
