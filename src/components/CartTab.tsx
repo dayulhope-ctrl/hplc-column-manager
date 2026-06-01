@@ -159,12 +159,24 @@ export default function CartTab({
       }
     } catch { /* 무시 */ }
 
-    // 재고 0 자동 추가 (저장된 것·삭제된 것 제외)
+    // 승인된 구매요청이 있는 칼럼 ID 집합 (중복 방지)
+    const approvedColumnIds = new Set(approvedRequests.map(r => r.column_model_id));
+
+    // 재고 0 자동 추가 (저장된 것·삭제된 것·이미 승인된 것 제외)
     const lowStockItems: UnifiedCartItem[] = columns
-      .filter(c => c.total_stock === 0 && c.purchase_status !== '발주 완료' && !savedColumnIds.has(c.id) && !removedIds.has(c.id))
+      .filter(c =>
+        c.total_stock === 0 &&
+        c.purchase_status !== '발주 완료' &&
+        !savedColumnIds.has(c.id) &&
+        !removedIds.has(c.id) &&
+        !approvedColumnIds.has(c.id)   // ← 승인된 구매요청 있으면 제외
+      )
       .map(col => makeDirectItem(col, 'low_stock'));
 
-    setUnifiedCart([...directItems, ...lowStockItems]);
+    // localStorage에서 복원된 direct 항목 중 이미 승인된 것도 제거
+    const filteredDirectItems = directItems.filter(i => !approvedColumnIds.has(i.columnModelId!));
+
+    setUnifiedCart([...filteredDirectItems, ...lowStockItems]);
     setInitialized(true);
   }, [columns, initialized]);
 
@@ -180,10 +192,17 @@ export default function CartTab({
       const newApproved = approvedRequests
         .filter(r => r.status === 'approved' && !existingApprovedIds.has(r.id))
         .map(makeApprovedItem);
-      if (newApproved.length === 0 && kept.length === prev.length) return prev;
+
+      // 새로 승인된 칼럼의 direct 항목 제거 (중복 방지)
+      const newApprovedColIds = new Set(newApproved.map(i => i.columnModelId).filter(Boolean));
+      const deduped = newApprovedColIds.size > 0
+        ? kept.filter(i => i.type !== 'direct' || !newApprovedColIds.has(i.columnModelId))
+        : kept;
+
+      if (newApproved.length === 0 && deduped.length === prev.length) return prev;
       // approved 항목을 맨 위에 배치
-      const directItems = kept.filter(i => i.type === 'direct');
-      const approvedItems = kept.filter(i => i.type === 'approved');
+      const directItems   = deduped.filter(i => i.type === 'direct');
+      const approvedItems = deduped.filter(i => i.type === 'approved');
       return [...newApproved, ...approvedItems, ...directItems];
     });
   }, [approvedRequests, initialized]);
