@@ -17,6 +17,7 @@ export async function GET() {
       totalModels: columns?.length || 0,
       totalStock: columns?.reduce((sum, c) => sum + (c.total_stock || 0), 0) || 0,
       purchaseRequiredCount: columns?.filter(c => c.total_stock === 0 && !c.purchase_status).length || 0,
+      approvedRequestCount: columns?.filter(c => c.purchase_status === '구매 승인').length || 0,
       orderCompletedCount: columns?.filter(c => c.purchase_status === '발주 완료').length || 0,
       totalValue: columns?.reduce((sum, c) => sum + (c.unit_price * c.total_stock), 0) || 0,
       pendingRequestsCount: pendingCount || 0,

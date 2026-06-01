@@ -4,7 +4,7 @@
 
 export type ColumnStatus = '사용 중' | '재고 대기' | '폐기 완료' | '입고 예정';
 // 실제 DB에서 사용하는 값 (04_fixes.sql 마이그레이션 이후)
-export type PurchaseStatus = '발주 완료' | '입고 완료';
+export type PurchaseStatus = '발주 완료' | '입고 완료' | '구매 승인';
 export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'ordered' | 'received';
 export type UrgencyLevel = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -125,6 +125,7 @@ export interface DashboardStats {
   totalModels: number;
   totalStock: number;
   purchaseRequiredCount: number;
+  approvedRequestCount: number;
   orderCompletedCount: number;
   totalValue: number;
   pendingRequestsCount: number;

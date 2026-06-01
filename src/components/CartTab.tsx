@@ -30,6 +30,7 @@ interface UnifiedCartItem {
 interface Props {
   columns: ColumnModel[];
   approvedRequests: PurchaseRequest[];
+  allRequests?: PurchaseRequest[];
   adminName?: string;
   onOrderCompleted?: () => void;
   isAdmin?: boolean;
@@ -96,7 +97,7 @@ function makeApprovedItem(r: PurchaseRequest): UnifiedCartItem {
 }
 
 export default function CartTab({
-  columns, approvedRequests, adminName, onOrderCompleted, isAdmin = true,
+  columns, approvedRequests, allRequests, adminName, onOrderCompleted, isAdmin = true,
 }: Props) {
   const [unifiedCart, setUnifiedCart] = useState<UnifiedCartItem[]>([]);
   const [initialized, setInitialized]   = useState(false);
@@ -195,15 +196,17 @@ export default function CartTab({
       } catch { /* 무시 */ }
       setManuallyRemovedIds(removedIds);
 
-      // 전체 구매요청 조회 → pending/approved 상태인 칼럼은 자동 추가 금지
+      // 전체 구매요청 조회 → 완료/입고 제외한 모든 요청의 칼럼은 자동 추가 금지
       let activeRequestColIds = new Set<string>();
       try {
-        const res  = await fetch('/api/requests');
-        const data = await res.json();
-        const allRequests: { column_model_id: string; status: string }[] = data.requests || [];
+        const sourceRequests = allRequests ?? await (async () => {
+          const res = await fetch('/api/requests');
+          const data = await res.json();
+          return (data.requests || []) as { column_model_id: string; status: string }[];
+        })();
         activeRequestColIds = new Set(
-          allRequests
-            .filter(r => ['pending', 'approved'].includes(r.status))
+          sourceRequests
+            .filter(r => !['ordered', 'received'].includes(r.status))
             .map(r => r.column_model_id)
         );
       } catch { /* 무시 */ }
@@ -266,16 +269,45 @@ export default function CartTab({
     if (!initialized) return;
     setUnifiedCart(prev => {
       const approvedIds = new Set(approvedRequests.map(r => r.id));
-      // 사라진 approved 항목 제거 (ordered/rejected 처리됨)
+
+      // 사라진 approved 항목 (거절/취소됨) → 제거 + 칼럼 ID 추적
+      const removedApprovedItems = prev.filter(
+        item => item.type === 'approved' && item.purchaseRequestId && !approvedIds.has(item.purchaseRequestId)
+      );
+
       const kept = prev.filter(item => item.type !== 'approved' || (item.purchaseRequestId && approvedIds.has(item.purchaseRequestId)));
+
+      // 거절된 approved 항목의 칼럼은 low_stock 재추가 방지를 위해 제거 목록에 추가
+      if (removedApprovedItems.length > 0) {
+        const removedColIds = removedApprovedItems
+          .map(i => i.columnModelId)
+          .filter((id): id is string => !!id);
+        setManuallyRemovedIds(prevRemoved => {
+          const next = new Set(prevRemoved);
+          removedColIds.forEach(id => next.add(id));
+          localStorage.setItem(REMOVED_KEY, JSON.stringify([...next]));
+          return next;
+        });
+      }
+
       // 새로 추가된 approved 항목 병합
       const existingApprovedIds = new Set(kept.filter(i => i.type === 'approved').map(i => i.purchaseRequestId));
       const newApproved = approvedRequests
         .filter(r => r.status === 'approved' && !existingApprovedIds.has(r.id))
         .map(makeApprovedItem);
 
-      // 새로 승인된 칼럼의 direct 항목 제거 (중복 방지)
+      // 새로 승인된 칼럼의 direct 항목 제거 (중복 방지) + manuallyRemovedIds에서도 제거
       const newApprovedColIds = new Set(newApproved.map(i => i.columnModelId).filter(Boolean));
+      if (newApprovedColIds.size > 0) {
+        setManuallyRemovedIds(prevRemoved => {
+          const hasAny = [...newApprovedColIds].some(id => prevRemoved.has(id!));
+          if (!hasAny) return prevRemoved;
+          const next = new Set(prevRemoved);
+          newApprovedColIds.forEach(id => id && next.delete(id));
+          localStorage.setItem(REMOVED_KEY, JSON.stringify([...next]));
+          return next;
+        });
+      }
       const deduped = newApprovedColIds.size > 0
         ? kept.filter(i => i.type !== 'direct' || !newApprovedColIds.has(i.columnModelId))
         : kept;
@@ -288,27 +320,48 @@ export default function CartTab({
     });
   }, [approvedRequests, initialized]);
 
+  // ── pending 요청이 생기면 해당 칼럼의 direct(재고부족/수동추가) 항목 즉시 제거 ──
+  useEffect(() => {
+    if (!initialized) return;
+    const pendingColIds = new Set(
+      (allRequests || [])
+        .filter(r => r.status === 'pending')
+        .map(r => r.column_model_id)
+    );
+    if (pendingColIds.size === 0) return;
+
+    setUnifiedCart(prev => {
+      const filtered = prev.filter(
+        item => item.type !== 'direct' || !item.columnModelId || !pendingColIds.has(item.columnModelId)
+      );
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [allRequests, initialized]);
+
   // ── 새 재고 0 칼럼 동기화 (초기화 이후 columns 변경 시) ──
-  // approved/pending 요청 있는 칼럼은 approvedRequests에서도 걸러짐 (existingColIds에 포함됨)
   useEffect(() => {
     if (!initialized || columns.length === 0) return;
     setUnifiedCart(prev => {
-      // 장바구니에 이미 있는 칼럼 ID (approved 포함)
       const existingColIds = new Set(prev.map(i => i.columnModelId).filter(Boolean));
-      // 현재 approvedRequests에 있는 칼럼도 제외 (pending 상태는 다음 승인 시 추가됨)
-      const approvedColIds = new Set(approvedRequests.map(r => r.column_model_id));
+      // purchase_status가 있는 칼럼은 모두 제외 (구매 승인 / 발주 완료 포함)
+      // allRequests가 있으면 완료/입고 제외한 모든 요청의 칼럼을 제외 (pending/rejected 포함)
+      const activeColIds = new Set(
+        (allRequests || [])
+          .filter(r => !['ordered', 'received'].includes(r.status))
+          .map(r => r.column_model_id)
+      );
       const newItems = columns
         .filter(c =>
           c.total_stock === 0 &&
-          c.purchase_status !== '발주 완료' &&
+          !c.purchase_status &&
           !existingColIds.has(c.id) &&
           !manuallyRemovedIds.has(c.id) &&
-          !approvedColIds.has(c.id)
+          !activeColIds.has(c.id)
         )
         .map(col => makeDirectItem(col, 'low_stock'));
       return newItems.length > 0 ? [...prev, ...newItems] : prev;
     });
-  }, [columns, initialized, manuallyRemovedIds, approvedRequests]);
+  }, [columns, initialized, manuallyRemovedIds, approvedRequests, allRequests]);
 
   // ── 통합 발주 핸들러 ──
   const handleOrder = async () => {

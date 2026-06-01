@@ -34,8 +34,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (action === 'approve') {
       updateData.status = 'approved';
+      // 칼럼 구매 승인 상태 반영 → 대시보드 "구매 필요"에서 제외
+      await sb
+        .from('column_models')
+        .update({ purchase_status: '구매 승인' })
+        .eq('id', request.column_model_id);
     } else if (action === 'reject') {
       updateData.status = 'rejected';
+      // 칼럼 상태 초기화 → 대시보드 "구매 필요"로 복귀
+      await sb
+        .from('column_models')
+        .update({ purchase_status: null })
+        .eq('id', request.column_model_id);
     } else if (action === 'order') {
       updateData.status = 'ordered';
       updateData.ordered_at = new Date().toISOString();
@@ -94,10 +104,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (action === 'cancel_order') {
       updateData.status = 'approved';
       updateData.ordered_at = null;
-      // 칼럼 발주 상태 초기화
+      // 칼럼 발주 취소 → '구매 승인' 상태로 복귀 (장바구니에 다시 표시됨)
       await sb
         .from('column_models')
-        .update({ purchase_status: null, purchase_quantity: null, order_date: null })
+        .update({ purchase_status: '구매 승인', purchase_quantity: null, order_date: null })
         .eq('id', request.column_model_id);
     }
 

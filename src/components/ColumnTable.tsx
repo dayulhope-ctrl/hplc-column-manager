@@ -99,8 +99,12 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
                     </td>
                     <td className="px-4 py-3 text-center">
                       {col.purchase_status === '발주 완료' ? (
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700">
                           발주됨
+                        </span>
+                      ) : col.purchase_status === '구매 승인' ? (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
+                          구매 대기
                         </span>
                       ) : isOutOfStock ? (
                         <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">

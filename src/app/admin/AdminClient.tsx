@@ -201,10 +201,11 @@ export default function AdminClient({ adminName, username }: Props) {
         {tab === 'dashboard' && (
           <>
             {stats && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <StatsCard icon={Package} label="총 칼럼 수" value={stats.totalModels} description="등록 모델" color="blue" />
                 <StatsCard icon={FlaskConical} label="총 재고" value={stats.totalStock} description="보유 수량" color="green" />
                 <StatsCard icon={ShoppingCart} label="구매 필요" value={stats.purchaseRequiredCount} description="재고 0개" color="red" />
+                <StatsCard icon={ClipboardList} label="구매 대기" value={stats.approvedRequestCount} description="승인 후 장바구니" color="blue" />
                 <StatsCard icon={CheckCircle} label="발주 완료" value={stats.orderCompletedCount} description="진행 중" color="amber" />
                 <StatsCard icon={Activity} label="총 자산가치" value={`₩${stats.totalValue.toLocaleString()}원`} description="현재 재고" color="purple" />
               </div>
@@ -283,6 +284,7 @@ export default function AdminClient({ adminName, username }: Props) {
           <CartTab
             columns={columns}
             approvedRequests={requests.filter(r => r.status === 'approved')}
+            allRequests={requests}
             adminName={adminName || username}
             onOrderCompleted={fetchData}
           />
