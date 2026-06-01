@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase';
+import { sendTelegramMessage } from '@/lib/telegram';
 
 // 구매 요청 목록 (게스트/팀원/관리자 모두 조회 가능)
 export async function GET(req: NextRequest) {
@@ -129,6 +130,20 @@ export async function POST(req: NextRequest) {
         quantity: body.quantity,
       },
     });
+
+    // ── 텔레그램 알림 (팀원 구매요청 시에만, 관리자 직접 발주 제외) ──
+    if (initialStatus === 'pending') {
+      const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+      await sendTelegramMessage(
+        `🛒 <b>새 구매요청이 접수되었습니다</b>\n\n` +
+        `📦 칼럼: ${data.column_models?.model_name || '-'}\n` +
+        `🗒️ Cat. No: ${data.column_models?.cat_no || '-'}\n` +
+        `👤 요청자: ${requestedBy}\n` +
+        `📊 수량: ${body.quantity}개\n` +
+        `📝 사유: ${body.reason || '-'}\n` +
+        `⏰ 시간: ${now}`
+      );
+    }
 
     return NextResponse.json({ request: data });
   } catch (e: any) {
