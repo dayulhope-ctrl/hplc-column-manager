@@ -109,6 +109,8 @@ export default function CartTab({
   // ── 수정 모달 ──
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
+    catNo:        '',
+    modelName:    '',
     quantity:     1,
     unitPrice:    0,
     urgency:      'normal' as UrgencyLevel,
@@ -120,6 +122,8 @@ export default function CartTab({
 
   const openEdit = (item: UnifiedCartItem) => {
     setEditForm({
+      catNo:        item.catNo,
+      modelName:    item.modelName,
       quantity:     item.quantity,
       unitPrice:    item.unitPrice,
       urgency:      item.urgency,
@@ -137,6 +141,8 @@ export default function CartTab({
       i.key === editingKey
         ? {
             ...i,
+            catNo:        editForm.catNo || i.catNo,
+            modelName:    editForm.modelName || i.modelName,
             quantity:     Math.max(1, editForm.quantity),
             unitPrice:    Math.max(0, editForm.unitPrice),
             urgency:      editForm.urgency,
@@ -630,15 +636,19 @@ export default function CartTab({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cat. No</label>
                     <input
-                      value={item.catNo} readOnly
-                      className="w-full px-3 py-2 border rounded-lg text-sm bg-gray-50 text-gray-500 font-mono"
+                      type="text"
+                      value={editForm.catNo}
+                      onChange={e => setEditForm(f => ({ ...f, catNo: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">모델명</label>
                     <input
-                      value={item.modelName} readOnly
-                      className="w-full px-3 py-2 border rounded-lg text-sm bg-gray-50 text-gray-500"
+                      type="text"
+                      value={editForm.modelName}
+                      onChange={e => setEditForm(f => ({ ...f, modelName: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                     />
                   </div>
                 </div>
