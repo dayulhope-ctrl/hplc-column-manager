@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ShoppingCart, Plus, Search, Send, Trash2 } from 'lucide-react';
+import { ShoppingCart, Plus, Search, Send, Trash2, Pencil, X } from 'lucide-react';
 import { ColumnModel, PurchaseRequest, UrgencyLevel } from '@/types';
 
 // ── 통합 장바구니 아이템 ──
@@ -99,6 +99,30 @@ export default function CartTab({
   const [searchQuery, setSearchQuery]   = useState('');
   const [submitting, setSubmitting]     = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // ── 수정 모달 ──
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editForm, setEditForm]     = useState({ quantity: 1, unitPrice: 0, urgency: 'normal' as UrgencyLevel, reason: '' });
+
+  const openEdit = (item: UnifiedCartItem) => {
+    setEditForm({
+      quantity:  item.quantity,
+      unitPrice: item.unitPrice,
+      urgency:   item.urgency,
+      reason:    item.reason || '',
+    });
+    setEditingKey(item.key);
+  };
+
+  const saveEdit = () => {
+    if (!editingKey) return;
+    setUnifiedCart(prev => prev.map(i =>
+      i.key === editingKey
+        ? { ...i, quantity: Math.max(1, editForm.quantity), unitPrice: Math.max(0, editForm.unitPrice), urgency: editForm.urgency, reason: editForm.reason }
+        : i
+    ));
+    setEditingKey(null);
+  };
 
   // 메시지 자동 소거
   useEffect(() => {
@@ -424,6 +448,7 @@ export default function CartTab({
                     <th className="px-3 py-2.5 text-right">합계</th>
                     <th className="px-3 py-2.5 text-center">재고</th>
                     <th className="px-3 py-2.5 text-left">긴급도</th>
+                    {isAdmin && <th className="px-3 py-2.5 text-center">수정</th>}
                     {isAdmin && <th className="px-3 py-2.5 text-center">삭제</th>}
                   </tr>
                 </thead>
@@ -480,6 +505,17 @@ export default function CartTab({
                       {isAdmin && (
                         <td className="px-3 py-2.5 text-center">
                           <button
+                            onClick={() => openEdit(item)}
+                            className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="수정"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
+                      {isAdmin && (
+                        <td className="px-3 py-2.5 text-center">
+                          <button
                             onClick={() => handleDelete(item)}
                             className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             title={item.type === 'approved' ? '구매요청 삭제' : '장바구니에서 제거'}
@@ -518,6 +554,91 @@ export default function CartTab({
           </>
         )}
       </div>
+
+      {/* 수정 모달 */}
+      {isAdmin && editingKey && (() => {
+        const item = unifiedCart.find(i => i.key === editingKey);
+        if (!item) return null;
+        return (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b">
+                <div>
+                  <h3 className="font-bold text-gray-900">장바구니 항목 수정</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{item.modelName}</p>
+                </div>
+                <button onClick={() => setEditingKey(null)} className="p-1 hover:bg-gray-100 rounded text-gray-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                {/* 수량 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">수량</label>
+                  <input
+                    type="number" min={1}
+                    value={editForm.quantity}
+                    onChange={e => setEditForm(f => ({ ...f, quantity: parseInt(e.target.value) || 1 }))}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+                {/* 단가 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    단가 (원)
+                    {item.unitPrice === 0 && <span className="ml-1 text-xs text-amber-500">※ 등록된 단가 없음</span>}
+                  </label>
+                  <input
+                    type="number" min={0}
+                    value={editForm.unitPrice}
+                    onChange={e => setEditForm(f => ({ ...f, unitPrice: parseInt(e.target.value) || 0 }))}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+                {/* 긴급도 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">긴급도</label>
+                  <select
+                    value={editForm.urgency}
+                    onChange={e => setEditForm(f => ({ ...f, urgency: e.target.value as UrgencyLevel }))}
+                    className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  >
+                    {URGENCY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                {/* 사유 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">사유</label>
+                  <input
+                    type="text"
+                    value={editForm.reason}
+                    onChange={e => setEditForm(f => ({ ...f, reason: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    placeholder="구매 사유 입력"
+                  />
+                </div>
+                {/* 예상 합계 미리보기 */}
+                <div className="bg-blue-50 rounded-lg px-4 py-2 flex items-center justify-between text-sm">
+                  <span className="text-gray-500">예상 합계</span>
+                  <span className="font-bold text-blue-700">
+                    ₩{(Math.max(1, editForm.quantity) * Math.max(0, editForm.unitPrice)).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2 px-5 pb-5">
+                <button
+                  onClick={() => setEditingKey(null)}
+                  className="flex-1 px-4 py-2.5 border rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                >취소</button>
+                <button
+                  onClick={saveEdit}
+                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+                >저장</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 칼럼 수동 추가 모달 */}
       {isAdmin && showAddModal && (
