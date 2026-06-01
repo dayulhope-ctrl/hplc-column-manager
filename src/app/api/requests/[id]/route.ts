@@ -34,18 +34,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (action === 'approve') {
       updateData.status = 'approved';
-      // 칼럼 구매 승인 상태 반영 → 대시보드 "구매 필요"에서 제외
+      // draft 칼럼이면 대시보드에 공개 + 구매 승인 상태 설정
       await sb
         .from('column_models')
-        .update({ purchase_status: '구매 승인' })
+        .update({ purchase_status: '구매 승인', is_draft: false })
         .eq('id', request.column_model_id);
     } else if (action === 'reject') {
       updateData.status = 'rejected';
-      // 칼럼 상태 초기화 → 대시보드 "구매 필요"로 복귀
-      await sb
-        .from('column_models')
-        .update({ purchase_status: null })
-        .eq('id', request.column_model_id);
+      const col = request.column_models;
+      if (col?.is_draft) {
+        // draft 칼럼이면 삭제 (요청으로 만들어진 임시 칼럼)
+        await sb
+          .from('column_models')
+          .delete()
+          .eq('id', request.column_model_id);
+      } else {
+        // 기존 칼럼이면 상태만 초기화 → 대시보드 "구매 필요"로 복귀
+        await sb
+          .from('column_models')
+          .update({ purchase_status: null })
+          .eq('id', request.column_model_id);
+      }
     } else if (action === 'order') {
       updateData.status = 'ordered';
       updateData.ordered_at = new Date().toISOString();

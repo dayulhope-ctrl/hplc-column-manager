@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
             total_stock: 0,
             min_safety_stock: 2,
             unit_price: 0,
+            is_draft: true, // 승인 전까지 대시보드에 숨김
           })
           .select('id')
           .single();

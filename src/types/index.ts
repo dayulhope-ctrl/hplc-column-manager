@@ -27,6 +27,7 @@ export interface ColumnModel {
   order_date: string | null;
   notes: string | null;
   products_used: string[] | null;
+  is_draft: boolean;
   created_at: string;
   updated_at: string;
 }

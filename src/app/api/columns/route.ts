@@ -11,7 +11,8 @@ export async function GET(req: NextRequest) {
     const filter = searchParams.get('filter') || 'all'; // all, low_stock, need_purchase, ordered
     
     const sb = createServerClient();
-    let query = sb.from('column_models').select('*').order('model_name', { ascending: true });
+    // is_draft=true 칼럼은 기본적으로 숨김 (구매요청 승인 전 임시 생성된 칼럼)
+    let query = sb.from('column_models').select('*').eq('is_draft', false).order('model_name', { ascending: true });
 
     if (search) {
       query = query.or(`model_name.ilike.%${search}%,cat_no.ilike.%${search}%,kep_code.ilike.%${search}%`);
