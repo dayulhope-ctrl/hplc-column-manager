@@ -12,6 +12,8 @@ interface UnifiedCartItem {
   modelName: string;
   catNo: string;
   kepCode: string | null;
+  size: string | null;         // 사이즈 (예: 4.6mm × 250mm)
+  particleSize: number | null; // 입자크기 (µm)
   quantity: number;
   unitPrice: number;
   totalStock: number;
@@ -59,6 +61,8 @@ function makeDirectItem(col: ColumnModel, origin: 'low_stock' | 'manual' = 'low_
     modelName: col.model_name,
     catNo: col.cat_no,
     kepCode: col.kep_code,
+    size: col.size,
+    particleSize: col.particle_size,
     quantity: Math.max(1, col.min_safety_stock || 1),
     unitPrice: col.unit_price,
     totalStock: col.total_stock,
@@ -77,6 +81,8 @@ function makeApprovedItem(r: PurchaseRequest): UnifiedCartItem {
     modelName: r.column_models?.model_name || '',
     catNo: r.column_models?.cat_no || '',
     kepCode: r.column_models?.kep_code || null,
+    size: r.column_models?.size || null,
+    particleSize: r.column_models?.particle_size || null,
     quantity: r.quantity,
     unitPrice: r.column_models?.unit_price || 0,
     totalStock: r.column_models?.total_stock || 0,
@@ -102,14 +108,25 @@ export default function CartTab({
 
   // ── 수정 모달 ──
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editForm, setEditForm]     = useState({ quantity: 1, unitPrice: 0, urgency: 'normal' as UrgencyLevel, reason: '' });
+  const [editForm, setEditForm] = useState({
+    quantity:     1,
+    unitPrice:    0,
+    urgency:      'normal' as UrgencyLevel,
+    reason:       '',
+    kepCode:      '',
+    size:         '',
+    particleSize: '',
+  });
 
   const openEdit = (item: UnifiedCartItem) => {
     setEditForm({
-      quantity:  item.quantity,
-      unitPrice: item.unitPrice,
-      urgency:   item.urgency,
-      reason:    item.reason || '',
+      quantity:     item.quantity,
+      unitPrice:    item.unitPrice,
+      urgency:      item.urgency,
+      reason:       item.reason || '',
+      kepCode:      item.kepCode || '',
+      size:         item.size || '',
+      particleSize: item.particleSize?.toString() || '',
     });
     setEditingKey(item.key);
   };
@@ -118,7 +135,16 @@ export default function CartTab({
     if (!editingKey) return;
     setUnifiedCart(prev => prev.map(i =>
       i.key === editingKey
-        ? { ...i, quantity: Math.max(1, editForm.quantity), unitPrice: Math.max(0, editForm.unitPrice), urgency: editForm.urgency, reason: editForm.reason }
+        ? {
+            ...i,
+            quantity:     Math.max(1, editForm.quantity),
+            unitPrice:    Math.max(0, editForm.unitPrice),
+            urgency:      editForm.urgency,
+            reason:       editForm.reason,
+            kepCode:      editForm.kepCode || null,
+            size:         editForm.size || null,
+            particleSize: editForm.particleSize ? parseFloat(editForm.particleSize) : null,
+          }
         : i
     ));
     setEditingKey(null);
@@ -136,7 +162,17 @@ export default function CartTab({
     if (!initialized) return;
     const data = unifiedCart
       .filter(i => i.type === 'direct')
-      .map(i => ({ id: i.columnModelId, qty: i.quantity, reason: i.reason || '', urgency: i.urgency, origin: i.origin }));
+      .map(i => ({
+        id:          i.columnModelId,
+        qty:         i.quantity,
+        reason:      i.reason || '',
+        urgency:     i.urgency,
+        origin:      i.origin,
+        unitPrice:   i.unitPrice,
+        kepCode:     i.kepCode,
+        size:        i.size,
+        particleSize: i.particleSize,
+      }));
     localStorage.setItem(CART_KEY, JSON.stringify(data));
   }, [unifiedCart, initialized]);
 
@@ -172,7 +208,7 @@ export default function CartTab({
       try {
         const raw = localStorage.getItem(CART_KEY);
         if (raw) {
-          const saved: { id: string; qty: number; reason: string; urgency: any; origin?: string }[] = JSON.parse(raw);
+          const saved: { id: string; qty: number; reason: string; urgency: any; origin?: string; unitPrice?: number; kepCode?: string | null; size?: string | null; particleSize?: number | null }[] = JSON.parse(raw);
           for (const s of saved) {
             const col = columns.find(c => c.id === s.id);
             if (col) {
@@ -182,9 +218,11 @@ export default function CartTab({
                 origin: (s.origin as any) || 'manual',
                 modelName: col.model_name,
                 catNo: col.cat_no,
-                kepCode: col.kep_code,
+                kepCode: s.kepCode !== undefined ? s.kepCode : col.kep_code,
+                size: s.size !== undefined ? s.size : col.size,
+                particleSize: s.particleSize !== undefined ? s.particleSize : col.particle_size,
                 quantity: s.qty,
-                unitPrice: col.unit_price,
+                unitPrice: s.unitPrice !== undefined ? s.unitPrice : col.unit_price,
                 totalStock: col.total_stock,
                 columnModelId: col.id,
                 reason: s.reason,
@@ -560,71 +598,145 @@ export default function CartTab({
         const item = unifiedCart.find(i => i.key === editingKey);
         if (!item) return null;
         return (
-          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl">
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl my-auto">
+              {/* 헤더 */}
               <div className="flex items-center justify-between px-5 py-4 border-b">
-                <div>
+                <div className="flex items-center gap-2">
+                  <OriginBadge origin={item.origin} />
                   <h3 className="font-bold text-gray-900">장바구니 항목 수정</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">{item.modelName}</p>
                 </div>
                 <button onClick={() => setEditingKey(null)} className="p-1 hover:bg-gray-100 rounded text-gray-400">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-5 space-y-4">
-                {/* 수량 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">수량</label>
-                  <input
-                    type="number" min={1}
-                    value={editForm.quantity}
-                    onChange={e => setEditForm(f => ({ ...f, quantity: parseInt(e.target.value) || 1 }))}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
+
+              <div className="p-5 space-y-3">
+                {/* 구매요청 원본 정보 (읽기 전용) */}
+                {item.type === 'approved' && (
+                  <div className="bg-blue-50 rounded-xl p-3 space-y-2 text-xs">
+                    <p className="font-semibold text-blue-700 mb-1">구매요청 원본 정보</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600">
+                      <span className="font-medium">요청자</span><span>{item.requestedBy || '-'}</span>
+                      <span className="font-medium">Cat. No</span><span className="font-mono">{item.catNo}</span>
+                      <span className="font-medium">요청 수량</span><span>{item.quantity}개</span>
+                      <span className="font-medium">요청 사유</span><span>{item.reason || '-'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cat. No / 모델명 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cat. No</label>
+                    <input
+                      value={item.catNo} readOnly
+                      className="w-full px-3 py-2 border rounded-lg text-sm bg-gray-50 text-gray-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">모델명</label>
+                    <input
+                      value={item.modelName} readOnly
+                      className="w-full px-3 py-2 border rounded-lg text-sm bg-gray-50 text-gray-500"
+                    />
+                  </div>
                 </div>
-                {/* 단가 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    단가 (원)
-                    {item.unitPrice === 0 && <span className="ml-1 text-xs text-amber-500">※ 등록된 단가 없음</span>}
-                  </label>
-                  <input
-                    type="number" min={0}
-                    value={editForm.unitPrice}
-                    onChange={e => setEditForm(f => ({ ...f, unitPrice: parseInt(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
+
+                {/* 사이즈 / 입자크기 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">사이즈</label>
+                    <input
+                      type="text"
+                      value={editForm.size}
+                      onChange={e => setEditForm(f => ({ ...f, size: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      placeholder="예: 4.6mm × 250mm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">입자크기 (µm)</label>
+                    <input
+                      type="number"
+                      value={editForm.particleSize}
+                      onChange={e => setEditForm(f => ({ ...f, particleSize: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      placeholder="예: 5"
+                    />
+                  </div>
                 </div>
-                {/* 긴급도 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">긴급도</label>
-                  <select
-                    value={editForm.urgency}
-                    onChange={e => setEditForm(f => ({ ...f, urgency: e.target.value as UrgencyLevel }))}
-                    className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  >
-                    {URGENCY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
+
+                {/* 수량 / 단가 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">수량 *</label>
+                    <input
+                      type="number" min={1}
+                      value={editForm.quantity}
+                      onChange={e => setEditForm(f => ({ ...f, quantity: parseInt(e.target.value) || 1 }))}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      단가 (원)
+                      {item.unitPrice === 0 && <span className="ml-1 text-xs text-amber-500">미입력</span>}
+                    </label>
+                    <input
+                      type="number" min={0}
+                      value={editForm.unitPrice}
+                      onChange={e => setEditForm(f => ({ ...f, unitPrice: parseInt(e.target.value) || 0 }))}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    />
+                  </div>
                 </div>
-                {/* 사유 */}
+
+                {/* KEP 코드 / 긴급도 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">KEP 코드</label>
+                    <input
+                      type="text"
+                      value={editForm.kepCode}
+                      onChange={e => setEditForm(f => ({ ...f, kepCode: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      placeholder="예: K005948"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">긴급도</label>
+                    <select
+                      value={editForm.urgency}
+                      onChange={e => setEditForm(f => ({ ...f, urgency: e.target.value as UrgencyLevel }))}
+                      className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    >
+                      {URGENCY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* 구매사유 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">사유</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">구매사유</label>
                   <input
                     type="text"
                     value={editForm.reason}
                     onChange={e => setEditForm(f => ({ ...f, reason: e.target.value }))}
                     className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                    placeholder="구매 사유 입력"
+                    placeholder="예: 제품명, 시험항목"
                   />
                 </div>
-                {/* 예상 합계 미리보기 */}
-                <div className="bg-blue-50 rounded-lg px-4 py-2 flex items-center justify-between text-sm">
+
+                {/* 예상 합계 */}
+                <div className="bg-blue-50 rounded-xl px-4 py-2.5 flex items-center justify-between text-sm">
                   <span className="text-gray-500">예상 합계</span>
                   <span className="font-bold text-blue-700">
                     ₩{(Math.max(1, editForm.quantity) * Math.max(0, editForm.unitPrice)).toLocaleString()}
                   </span>
                 </div>
               </div>
+
               <div className="flex gap-2 px-5 pb-5">
                 <button
                   onClick={() => setEditingKey(null)}
