@@ -7,7 +7,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const admin = await requireAdmin();
     const body = await req.json();
-    const { action, notes, unit_price, receiving_date } = body;
+    const { action, notes, unit_price, receiving_date, quantity } = body;
 
     if (!['approve', 'reject', 'order', 'receive', 'cancel_order'].includes(action)) {
       return NextResponse.json({ error: '잘못된 액션' }, { status: 400 });
@@ -58,14 +58,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     } else if (action === 'order') {
       updateData.status = 'ordered';
       updateData.ordered_at = new Date().toISOString();
+      // 장바구니에서 수정된 수량/단가 반영
+      const finalQuantity = quantity ?? request.quantity;
+      if (quantity !== undefined) updateData.quantity = finalQuantity;
       // 칼럼 발주 상태 업데이트
+      const colUpdate: any = {
+        purchase_status: '발주 완료',
+        purchase_quantity: finalQuantity,
+        order_date: new Date().toISOString().split('T')[0],
+      };
+      if (unit_price !== undefined && unit_price > 0) colUpdate.unit_price = unit_price;
       await sb
         .from('column_models')
-        .update({
-          purchase_status: '발주 완료',
-          purchase_quantity: request.quantity,
-          order_date: new Date().toISOString().split('T')[0],
-        })
+        .update(colUpdate)
         .eq('id', request.column_model_id);
     } else if (action === 'receive') {
       updateData.status = 'received';

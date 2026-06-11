@@ -410,7 +410,11 @@ export default function CartTab({
           return fetch(`/api/requests/${item.purchaseRequestId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'order' }),
+            body: JSON.stringify({
+              action: 'order',
+              quantity: item.quantity,
+              unit_price: item.unitPrice,
+            }),
           });
         }
         return fetch('/api/requests', {
