@@ -43,8 +43,9 @@ const URGENCY_OPTIONS = [
   { value: 'urgent', label: '긴급' },
 ];
 
-const CART_KEY    = 'hplc_cart_v2';
-const REMOVED_KEY = 'hplc_cart_removed_v2';
+const CART_KEY            = 'hplc_cart_v2';
+const REMOVED_KEY         = 'hplc_cart_removed_v2';
+const APPROVED_EDITS_KEY  = 'hplc_cart_approved_edits';
 
 function OriginBadge({ origin }: { origin: 'approved' | 'low_stock' | 'manual' }) {
   if (origin === 'approved')
@@ -138,22 +139,31 @@ export default function CartTab({
 
   const saveEdit = () => {
     if (!editingKey) return;
+    const updatedFields = {
+      catNo:        editForm.catNo,
+      modelName:    editForm.modelName,
+      quantity:     Math.max(1, editForm.quantity),
+      unitPrice:    Math.max(0, editForm.unitPrice),
+      urgency:      editForm.urgency,
+      reason:       editForm.reason,
+      kepCode:      editForm.kepCode || null,
+      size:         editForm.size || null,
+      particleSize: editForm.particleSize ? parseFloat(editForm.particleSize) : null,
+    };
     setUnifiedCart(prev => prev.map(i =>
       i.key === editingKey
-        ? {
-            ...i,
-            catNo:        editForm.catNo || i.catNo,
-            modelName:    editForm.modelName || i.modelName,
-            quantity:     Math.max(1, editForm.quantity),
-            unitPrice:    Math.max(0, editForm.unitPrice),
-            urgency:      editForm.urgency,
-            reason:       editForm.reason,
-            kepCode:      editForm.kepCode || null,
-            size:         editForm.size || null,
-            particleSize: editForm.particleSize ? parseFloat(editForm.particleSize) : null,
-          }
+        ? { ...i, ...updatedFields, catNo: updatedFields.catNo || i.catNo, modelName: updatedFields.modelName || i.modelName }
         : i
     ));
+    // approved 항목은 localStorage에 별도 저장 (새로고침 후 복원)
+    const editingItem = unifiedCart.find(i => i.key === editingKey);
+    if (editingItem?.type === 'approved' && editingItem.purchaseRequestId) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(APPROVED_EDITS_KEY) || '{}');
+        saved[editingItem.purchaseRequestId] = updatedFields;
+        localStorage.setItem(APPROVED_EDITS_KEY, JSON.stringify(saved));
+      } catch {}
+    }
     setEditingKey(null);
   };
 
@@ -245,10 +255,11 @@ export default function CartTab({
       } catch { /* 무시 */ }
 
       // 재고 0 자동 추가
-      // — 이미 저장된 것, 삭제된 것, 구매요청(pending/approved) 있는 것 제외
+      // — 이미 저장된 것, 삭제된 것, 구매요청(pending/approved) 있는 것, 최소 안전재고 0인 것 제외
       const lowStockItems: UnifiedCartItem[] = columns
         .filter(c =>
           c.total_stock === 0 &&
+          c.min_safety_stock > 0 &&           // ← 최소 안전재고 0이면 자동 추가 안 함
           c.purchase_status !== '발주 완료' &&
           !savedColumnIds.has(c.id) &&
           !removedIds.has(c.id) &&
@@ -288,13 +299,33 @@ export default function CartTab({
           localStorage.setItem(REMOVED_KEY, JSON.stringify([...next]));
           return next;
         });
+        // 거절된 항목의 수정 내용도 정리
+        try {
+          const edits = JSON.parse(localStorage.getItem(APPROVED_EDITS_KEY) || '{}');
+          let changed = false;
+          removedApprovedItems.forEach(item => {
+            if (item.purchaseRequestId && edits[item.purchaseRequestId]) {
+              delete edits[item.purchaseRequestId];
+              changed = true;
+            }
+          });
+          if (changed) localStorage.setItem(APPROVED_EDITS_KEY, JSON.stringify(edits));
+        } catch {}
       }
 
-      // 새로 추가된 approved 항목 병합
+      // 새로 추가된 approved 항목 병합 (저장된 수정 내용 복원)
       const existingApprovedIds = new Set(kept.filter(i => i.type === 'approved').map(i => i.purchaseRequestId));
+      const approvedEdits: Record<string, any> = (() => {
+        try { return JSON.parse(localStorage.getItem(APPROVED_EDITS_KEY) || '{}'); }
+        catch { return {}; }
+      })();
       const newApproved = approvedRequests
         .filter(r => r.status === 'approved' && !existingApprovedIds.has(r.id))
-        .map(makeApprovedItem);
+        .map(r => {
+          const base = makeApprovedItem(r);
+          const overrides = approvedEdits[r.id];
+          return overrides ? { ...base, ...overrides } : base;
+        });
 
       // 새로 승인된 칼럼의 direct 항목 제거 (중복 방지) + manuallyRemovedIds에서도 제거
       const newApprovedColIds = new Set(newApproved.map(i => i.columnModelId).filter(Boolean));
@@ -353,6 +384,7 @@ export default function CartTab({
       const newItems = columns
         .filter(c =>
           c.total_stock === 0 &&
+          c.min_safety_stock > 0 &&           // ← 최소 안전재고 0이면 자동 추가 안 함
           !c.purchase_status &&
           !existingColIds.has(c.id) &&
           !manuallyRemovedIds.has(c.id) &&
@@ -409,6 +441,15 @@ export default function CartTab({
             localStorage.setItem(REMOVED_KEY, JSON.stringify([...next]));
             return next;
           });
+        }
+        // approved 발주 완료 항목의 수정 내용 정리
+        const approvedOrdered = targets.filter(i => i.type === 'approved' && i.purchaseRequestId);
+        if (approvedOrdered.length > 0) {
+          try {
+            const edits = JSON.parse(localStorage.getItem(APPROVED_EDITS_KEY) || '{}');
+            approvedOrdered.forEach(i => { if (i.purchaseRequestId) delete edits[i.purchaseRequestId]; });
+            localStorage.setItem(APPROVED_EDITS_KEY, JSON.stringify(edits));
+          } catch {}
         }
         onOrderCompleted?.();
       } else {
