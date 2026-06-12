@@ -2,12 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ColumnModel } from '@/types';
-import { ShoppingCart, Edit, Trash2, AlertCircle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, Check } from 'lucide-react';
+import { ShoppingCart, Edit, Trash2, AlertCircle, ChevronDown, Check } from 'lucide-react';
 
-type SortKey = 'model_name' | 'length' | 'inner' | 'particle_size' | 'total_stock';
-type SortDir = 'asc' | 'desc';
-
-const LS_SORT_KEY   = 'hplc_column_sort';
 const LS_FILTER_KEY = 'hplc_column_filter';
 
 function parseSize(size: string | null | undefined): { length: number | null; inner: number | null } {
@@ -180,27 +176,17 @@ interface ColumnTableProps {
   usageMap?: Record<string, string[]>;
 }
 
-function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
-  if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
-  return sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
-}
 
 export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdit, onDelete, onRowClick, usageMap }: ColumnTableProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-  const [sortKey, setSortKey] = useState<SortKey>('model_name');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filterLengths,   setFilterLengths]   = useState<Set<string>>(new Set());
   const [filterInners,    setFilterInners]     = useState<Set<string>>(new Set());
   const [filterParticles, setFilterParticles]  = useState<Set<string>>(new Set());
 
   // localStorage 복원
   useEffect(() => {
-    try {
-      const s = localStorage.getItem(LS_SORT_KEY);
-      if (s) { const { key, dir } = JSON.parse(s); if (key) setSortKey(key); if (dir) setSortDir(dir); }
-    } catch {}
     try {
       const f = localStorage.getItem(LS_FILTER_KEY);
       if (f) {
@@ -212,11 +198,6 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
     } catch {}
   }, []);
 
-  // 정렬 저장
-  useEffect(() => {
-    localStorage.setItem(LS_SORT_KEY, JSON.stringify({ key: sortKey, dir: sortDir }));
-  }, [sortKey, sortDir]);
-
   // 필터 저장
   useEffect(() => {
     localStorage.setItem(LS_FILTER_KEY, JSON.stringify({
@@ -225,11 +206,6 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
       particles: [...filterParticles],
     }));
   }, [filterLengths, filterInners, filterParticles]);
-
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortDir('asc'); }
-  };
 
   const resetFilters = () => {
     setFilterLengths(new Set());
@@ -264,22 +240,8 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
     if (filterParticles.size > 0)
       result = result.filter(c => c.particle_size !== null && filterParticles.has(String(c.particle_size)));
 
-    return [...result].sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === 'length') {
-        cmp = (parseSize(a.size).length ?? Infinity) - (parseSize(b.size).length ?? Infinity);
-      } else if (sortKey === 'inner') {
-        cmp = (parseSize(a.size).inner ?? Infinity) - (parseSize(b.size).inner ?? Infinity);
-      } else if (sortKey === 'particle_size') {
-        cmp = (a.particle_size ?? Infinity) - (b.particle_size ?? Infinity);
-      } else if (sortKey === 'total_stock') {
-        cmp = a.total_stock - b.total_stock;
-      } else {
-        cmp = a.model_name.localeCompare(b.model_name, 'ko');
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [columns, sortKey, sortDir, filterLengths, filterInners, filterParticles]);
+    return result;
+  }, [columns, filterLengths, filterInners, filterParticles]);
 
   const hasFilter = filterLengths.size > 0 || filterInners.size > 0 || filterParticles.size > 0;
 
@@ -330,47 +292,12 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
             <tr>
-              <th
-                className="px-4 py-3 text-left cursor-pointer select-none hover:bg-gray-100"
-                onClick={() => handleSort('model_name')}
-              >
-                <span className="flex items-center gap-1">
-                  모델명 <SortIcon col="model_name" sortKey={sortKey} sortDir={sortDir} />
-                </span>
-              </th>
+              <th className="px-4 py-3 text-left">모델명</th>
               <th className="px-4 py-3 text-left">Cat. No</th>
-              <th
-                className="px-4 py-3 text-center hidden md:table-cell cursor-pointer select-none hover:bg-gray-100"
-                onClick={() => handleSort('length')}
-              >
-                <span className="flex items-center justify-center gap-1">
-                  길이(MM) <SortIcon col="length" sortKey={sortKey} sortDir={sortDir} />
-                </span>
-              </th>
-              <th
-                className="px-4 py-3 text-center hidden md:table-cell cursor-pointer select-none hover:bg-gray-100"
-                onClick={() => handleSort('inner')}
-              >
-                <span className="flex items-center justify-center gap-1">
-                  내경(MM) <SortIcon col="inner" sortKey={sortKey} sortDir={sortDir} />
-                </span>
-              </th>
-              <th
-                className="px-4 py-3 text-center hidden lg:table-cell cursor-pointer select-none hover:bg-gray-100"
-                onClick={() => handleSort('particle_size')}
-              >
-                <span className="flex items-center justify-center gap-1">
-                  입자 <SortIcon col="particle_size" sortKey={sortKey} sortDir={sortDir} />
-                </span>
-              </th>
-              <th
-                className="px-4 py-3 text-center cursor-pointer select-none hover:bg-gray-100"
-                onClick={() => handleSort('total_stock')}
-              >
-                <span className="flex items-center justify-center gap-1">
-                  재고 <SortIcon col="total_stock" sortKey={sortKey} sortDir={sortDir} />
-                </span>
-              </th>
+              <th className="px-4 py-3 text-center hidden md:table-cell">길이(MM)</th>
+              <th className="px-4 py-3 text-center hidden md:table-cell">내경(MM)</th>
+              <th className="px-4 py-3 text-center hidden lg:table-cell">입자</th>
+              <th className="px-4 py-3 text-center">재고</th>
               <th className="px-4 py-3 text-left hidden md:table-cell">KEP</th>
               <th className="px-4 py-3 text-right hidden lg:table-cell">단가</th>
               <th className="px-4 py-3 text-center">상태</th>
