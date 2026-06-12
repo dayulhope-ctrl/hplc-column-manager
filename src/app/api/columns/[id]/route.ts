@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-// 칼럼 삭제 (관리자)
+// 칼럼 숨김 처리 (대시보드에서 삭제 = is_hidden 플래그, 데이터는 보존)
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const admin = await requireAdmin();
@@ -56,7 +56,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
     const { error } = await sb
       .from('column_models')
-      .delete()
+      .update({ is_hidden: true })
       .eq('id', params.id);
 
     if (error) throw error;
@@ -64,7 +64,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     await sb.from('activity_logs').insert({
       actor: admin.username,
       actor_type: 'admin',
-      action: 'delete_column',
+      action: 'hide_column',
       target_type: 'column_model',
       target_id: params.id,
     });
@@ -75,6 +75,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       return NextResponse.json({ error: e.message }, { status: 403 });
     }
     console.error('Column DELETE error:', e);
-    return NextResponse.json({ error: '삭제 실패' }, { status: 500 });
+    return NextResponse.json({ error: '처리 실패' }, { status: 500 });
   }
 }

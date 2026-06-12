@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const sb = createServerClient();
 
-    const { data: columns, error } = await sb.from('column_models').select('*').eq('is_draft', false);
+    const { data: columns, error } = await sb.from('column_models').select('*').eq('is_draft', false).eq('is_hidden', false);
     if (error) throw error;
 
     const { count: pendingCount } = await sb

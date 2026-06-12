@@ -28,6 +28,7 @@ export interface ColumnModel {
   notes: string | null;
   products_used: string[] | null;
   is_draft: boolean;
+  is_hidden: boolean;
   created_at: string;
   updated_at: string;
 }
