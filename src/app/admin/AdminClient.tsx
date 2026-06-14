@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Package, FlaskConical, ShoppingCart, CheckCircle, Activity, Search,
   ClipboardList, Plus, Bell, Calendar, Edit, X,
-  History, BarChart2, FileText, Download,
+  History, BarChart2, FileText, Download, EyeOff,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
@@ -336,6 +336,7 @@ export default function AdminClient({ adminName, username }: Props) {
           column={editingColumn}
           onClose={() => setEditingColumn(null)}
           onSaved={() => { setEditingColumn(null); fetchData(); setMessage({ type: 'success', text: '수정되었습니다' }); }}
+          onHidden={() => { setEditingColumn(null); fetchData(); setMessage({ type: 'success', text: '대시보드에서 숨겼습니다' }); }}
         />
       )}
       {showAddColumn && (
@@ -410,6 +411,7 @@ function translateAction(action: string): string {
     create_column: '칼럼 추가',
     update_column: '칼럼 수정',
     delete_column: '칼럼 삭제',
+    hide_column: '칼럼 숨김',
     create_purchase_request: '구매 요청 생성',
     request_approve: '구매 요청 승인',
     request_reject: '구매 요청 거부',
@@ -423,7 +425,12 @@ function translateAction(action: string): string {
 // ============================
 // 칼럼 수정 다이얼로그
 // ============================
-function ColumnEditDialog({ column, onClose, onSaved }: { column: ColumnModel; onClose: () => void; onSaved: () => void }) {
+function ColumnEditDialog({ column, onClose, onSaved, onHidden }: {
+  column: ColumnModel;
+  onClose: () => void;
+  onSaved: () => void;
+  onHidden: () => void;
+}) {
   const [form, setForm] = useState({
     model_name: column.model_name,
     cat_no: column.cat_no,
@@ -435,6 +442,7 @@ function ColumnEditDialog({ column, onClose, onSaved }: { column: ColumnModel; o
     kep_code: column.kep_code || '',
   });
   const [loading, setLoading] = useState(false);
+  const [hiding, setHiding] = useState(false);
   const [error, setError] = useState('');
 
   const handleSave = async (e: React.FormEvent) => {
@@ -453,6 +461,18 @@ function ColumnEditDialog({ column, onClose, onSaved }: { column: ColumnModel; o
       return;
     }
     onSaved();
+  };
+
+  const handleHide = async () => {
+    if (!confirm(`"${column.model_name}"을(를) 대시보드에서 숨기시겠습니까?\n데이터는 보존되며 언제든 복원 가능합니다.`)) return;
+    setHiding(true);
+    const res = await fetch(`/api/columns/${column.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      setError('숨김 처리 실패');
+      setHiding(false);
+      return;
+    }
+    onHidden();
   };
 
   return (
@@ -504,6 +524,20 @@ function ColumnEditDialog({ column, onClose, onSaved }: { column: ColumnModel; o
           <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
             {loading ? '저장 중...' : '저장'}
           </button>
+        </div>
+
+        {/* 숨김 구분선 */}
+        <div className="border-t pt-3">
+          <button
+            type="button"
+            onClick={handleHide}
+            disabled={hiding}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 transition-colors"
+          >
+            <EyeOff className="w-4 h-4" />
+            {hiding ? '처리 중...' : '대시보드에서 숨기기'}
+          </button>
+          <p className="text-xs text-gray-400 text-center mt-1.5">데이터는 보존되며 구매/입고 이력에는 남아있습니다</p>
         </div>
       </form>
     </DialogShell>
