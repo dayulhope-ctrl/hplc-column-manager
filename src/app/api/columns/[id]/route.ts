@@ -54,12 +54,26 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     const admin = await requireAdmin();
     const sb = createServerClient();
 
+    // 1. 칼럼 숨김 + 구매 관련 상태 초기화 (구매 필요 없음으로 처리)
     const { error } = await sb
       .from('column_models')
-      .update({ is_hidden: true })
+      .update({
+        is_hidden: true,
+        purchase_status: null,
+        purchase_required: false,
+        purchase_quantity: null,
+        order_date: null,
+      })
       .eq('id', params.id);
 
     if (error) throw error;
+
+    // 2. 이 칼럼의 pending/approved 구매요청 → 자동 취소
+    await sb
+      .from('purchase_requests')
+      .update({ status: 'rejected', review_notes: '칼럼 숨김 처리로 자동 취소' })
+      .eq('column_model_id', params.id)
+      .in('status', ['pending', 'approved']);
 
     await sb.from('activity_logs').insert({
       actor: admin.username,
