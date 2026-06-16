@@ -10,7 +10,7 @@ function parseSize(size: string | null | undefined): { length: number | null; in
   if (!size) return { length: null, inner: null };
   const nums = size.match(/[\d.]+/g);
   if (!nums || nums.length < 2) return { length: Number(nums?.[0]) || null, inner: null };
-  return { length: Number(nums[0]), inner: Number(nums[1]) };
+  return { length: Number(nums[1]), inner: Number(nums[0]) };
 }
 
 // ── 엑셀 스타일 다중 선택 필터 컴포넌트 ──
