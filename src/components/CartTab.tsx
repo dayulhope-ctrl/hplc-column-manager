@@ -137,7 +137,7 @@ export default function CartTab({
     setEditingKey(item.key);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingKey) return;
     const updatedFields = {
       catNo:        editForm.catNo,
@@ -155,13 +155,26 @@ export default function CartTab({
         ? { ...i, ...updatedFields, catNo: updatedFields.catNo || i.catNo, modelName: updatedFields.modelName || i.modelName }
         : i
     ));
-    // approved 항목은 localStorage에 별도 저장 (새로고침 후 복원)
     const editingItem = unifiedCart.find(i => i.key === editingKey);
+    // approved 항목은 localStorage에 별도 저장 (새로고침 후 복원)
     if (editingItem?.type === 'approved' && editingItem.purchaseRequestId) {
       try {
         const saved = JSON.parse(localStorage.getItem(APPROVED_EDITS_KEY) || '{}');
         saved[editingItem.purchaseRequestId] = updatedFields;
         localStorage.setItem(APPROVED_EDITS_KEY, JSON.stringify(saved));
+      } catch {}
+    }
+    // 단가가 변경된 경우 대시보드 칼럼 단가도 동기 업데이트
+    if (editingItem?.columnModelId && updatedFields.unitPrice !== editingItem.unitPrice) {
+      try {
+        const res = await fetch(`/api/columns/${editingItem.columnModelId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ unit_price: updatedFields.unitPrice }),
+        });
+        if (res.ok) {
+          setMessage({ type: 'success', text: '단가가 장바구니와 대시보드에 반영되었습니다' });
+        }
       } catch {}
     }
     setEditingKey(null);
