@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FileText, CheckCircle, Calendar, Download, Trash2 } from 'lucide-react';
+import { FileText, CheckCircle, Calendar, Download, Trash2, Printer } from 'lucide-react';
 import { ReceivingRecord, MonthlyClosing } from '@/types';
 
 interface Props {
@@ -20,6 +20,75 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
   const [closing, setClosing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedClosing, setSelectedClosing] = useState<MonthlyClosing | null>(null);
+
+  const handlePrintClosing = (c: MonthlyClosing) => {
+    const records: any[] = Array.isArray(c.records) ? c.records : [];
+    const totalQtySum = records.reduce((s: number, r: any) => s + (r.quantity || 0), 0);
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8"/>
+<title>${c.month} 마감 상세</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic', sans-serif; font-size: 11px; color: #111; padding: 20px; }
+  h1 { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: #555; margin-bottom: 16px; }
+  .summary { display: flex; gap: 12px; margin-bottom: 16px; }
+  .summary-box { flex: 1; border: 1px solid #ddd; border-radius: 6px; padding: 10px; text-align: center; }
+  .summary-box .label { font-size: 10px; color: #666; margin-bottom: 4px; }
+  .summary-box .value { font-size: 16px; font-weight: bold; }
+  .summary-box.blue .value { color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #f3f4f6; text-align: left; padding: 6px 8px; font-size: 10px; color: #555; border-bottom: 1px solid #ddd; }
+  td { padding: 5px 8px; border-bottom: 1px solid #eee; }
+  tr.total td { background: #eff6ff; font-weight: bold; }
+  .right { text-align: right; }
+  .center { text-align: center; }
+  .mono { font-family: monospace; }
+  @media print { body { padding: 10px; } }
+</style>
+</head><body>
+<h1>${c.month} 마감 상세</h1>
+<p class="sub">마감일: ${c.closing_date} &nbsp;|&nbsp; 담당자: ${c.closed_by || '-'}</p>
+<div class="summary">
+  <div class="summary-box"><div class="label">총 수량</div><div class="value">${c.total_quantity}</div></div>
+  <div class="summary-box blue"><div class="label">총 금액</div><div class="value">₩${c.total_price?.toLocaleString()}</div></div>
+  <div class="summary-box"><div class="label">마감자</div><div class="value">${c.closed_by || '-'}</div></div>
+</div>
+<table>
+<thead><tr>
+  <th>발주일</th><th>KEP 코드</th><th>모델명</th><th>Cat. No</th>
+  <th>사이즈</th><th class="center">입자크기</th><th class="center">구매수량</th>
+  <th class="right">단가</th><th class="right">입고금액</th><th>입고일</th>
+</tr></thead>
+<tbody>
+${records.map((r: any) => `<tr>
+  <td>${r.order_date || '-'}</td>
+  <td class="mono">${r.kep_code || '-'}</td>
+  <td>${r.model_name}</td>
+  <td class="mono">${r.cat_no}</td>
+  <td>${r.size || '-'}</td>
+  <td class="center">${r.particle_size ? `${r.particle_size} µm` : '-'}</td>
+  <td class="center">${r.quantity}</td>
+  <td class="right">₩${r.unit_price?.toLocaleString() || '-'}</td>
+  <td class="right">₩${r.total_price?.toLocaleString() || '-'}</td>
+  <td>${r.receiving_date}</td>
+</tr>`).join('')}
+<tr class="total">
+  <td colspan="6">합계</td>
+  <td class="center">${totalQtySum}</td>
+  <td></td>
+  <td class="right">₩${c.total_price?.toLocaleString()}</td>
+  <td></td>
+</tr>
+</tbody>
+</table>
+</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 400);
+  };
 
   useEffect(() => {
     if (message) {
@@ -223,6 +292,7 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
                 <th className="px-4 py-2 text-left">담당자</th>
                 <th className="px-4 py-2 text-center">상세</th>
                 <th className="px-4 py-2 text-center">엑셀</th>
+                <th className="px-4 py-2 text-center">PDF</th>
                 {isAdmin && <th className="px-4 py-2 text-center">삭제</th>}
               </tr>
             </thead>
@@ -247,6 +317,12 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
                       <Download className="w-3 h-3" /> 엑셀
                     </a>
                   </td>
+                  <td className="px-4 py-2 text-center">
+                    <button onClick={() => handlePrintClosing(c)}
+                      className="px-2 py-0.5 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 inline-flex items-center gap-0.5">
+                      <Printer className="w-3 h-3" /> PDF
+                    </button>
+                  </td>
                   {isAdmin && (
                     <td className="px-4 py-2 text-center">
                       <button onClick={() => handleDeleteClosing(c.month)}
@@ -268,7 +344,13 @@ export default function ClosingDataTab({ adminName, isAdmin = true }: Props) {
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[80vh] flex flex-col shadow-xl">
             <div className="flex items-center justify-between p-5 border-b">
               <h3 className="font-bold">{selectedClosing.month} 마감 상세</h3>
-              <button onClick={() => setSelectedClosing(null)} className="p-1 hover:bg-gray-100 rounded">✕</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handlePrintClosing(selectedClosing)}
+                  className="px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center gap-1.5 text-sm">
+                  <Printer className="w-4 h-4" /> PDF 출력
+                </button>
+                <button onClick={() => setSelectedClosing(null)} className="p-1 hover:bg-gray-100 rounded">✕</button>
+              </div>
             </div>
             <div className="overflow-y-auto flex-1 p-5">
               <div className="grid grid-cols-3 gap-4 mb-4">
