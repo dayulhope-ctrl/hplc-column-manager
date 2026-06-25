@@ -280,8 +280,13 @@ export default function CartTab({
         )
         .map(col => makeDirectItem(col, 'low_stock'));
 
-      // localStorage 복원 direct 항목 중 구매요청 있는 것도 제거
-      const filteredDirectItems = directItems.filter(i => !activeRequestColIds.has(i.columnModelId!));
+      // localStorage 복원 direct 항목 중 구매요청 있는 것 또는 purchase_status 있는 것 제거
+      const filteredDirectItems = directItems.filter(i => {
+        if (activeRequestColIds.has(i.columnModelId!)) return false;
+        const col = columns.find(c => c.id === i.columnModelId);
+        if (col?.purchase_status) return false;
+        return true;
+      });
 
       setUnifiedCart([...filteredDirectItems, ...lowStockItems]);
       setInitialized(true);
@@ -388,10 +393,10 @@ export default function CartTab({
     setUnifiedCart(prev => {
       const existingColIds = new Set(prev.map(i => i.columnModelId).filter(Boolean));
       // purchase_status가 있는 칼럼은 모두 제외 (구매 승인 / 발주 완료 포함)
-      // allRequests가 있으면 완료/입고 제외한 모든 요청의 칼럼을 제외 (pending/rejected 포함)
+      // ordered/received는 이미 처리됐으므로 제외, 나머지(pending/approved/rejected)는 보호
       const activeColIds = new Set(
         (allRequests || [])
-          .filter(r => !['ordered', 'received'].includes(r.status))
+          .filter(r => ['pending', 'approved'].includes(r.status))
           .map(r => r.column_model_id)
       );
       const newItems = columns
