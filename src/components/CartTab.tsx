@@ -449,16 +449,6 @@ export default function CartTab({
         setMessage({ type: 'success', text: `${targets.length}건 발주 완료 처리되었습니다` });
         const orderedKeys = new Set(targets.map(i => i.key));
         setUnifiedCart(prev => prev.filter(i => !orderedKeys.has(i.key)));
-        // direct 발주 완료 항목은 removed 목록에서 제거 (purchase_status 변경으로 자동 추가 안 됨)
-        const directOrdered = targets.filter(i => i.type === 'direct' && i.columnModelId);
-        if (directOrdered.length > 0) {
-          setManuallyRemovedIds(prev => {
-            const next = new Set(prev);
-            directOrdered.forEach(i => next.delete(i.columnModelId!));
-            localStorage.setItem(REMOVED_KEY, JSON.stringify([...next]));
-            return next;
-          });
-        }
         // approved 발주 완료 항목의 수정 내용 정리
         const approvedOrdered = targets.filter(i => i.type === 'approved' && i.purchaseRequestId);
         if (approvedOrdered.length > 0) {
