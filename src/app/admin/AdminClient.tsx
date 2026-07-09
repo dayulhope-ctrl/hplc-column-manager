@@ -12,6 +12,7 @@ import ColumnTable from '@/components/ColumnTable';
 import MonthlyPurchaseChart from '@/components/charts/MonthlyPurchaseChart';
 import BudgetChart from '@/components/charts/BudgetChart';
 import IndividualColumnTab from '@/components/IndividualColumnTab';
+import TestMappingTab from '@/components/TestMappingTab';
 import ClosingTab from '@/components/ClosingTab';
 import CartTab from '@/components/CartTab';
 import ClosingDataTab from '@/components/ClosingDataTab';
@@ -27,7 +28,7 @@ interface Props {
   username: string;
 }
 
-type TabType = 'dashboard' | 'cart' | 'requests' | 'receiving' | 'closing_data' | 'purchase_history' | 'columns';
+type TabType = 'dashboard' | 'cart' | 'requests' | 'receiving' | 'closing_data' | 'purchase_history' | 'columns' | 'test_mapping';
 
 export default function AdminClient({ adminName, username }: Props) {
   const [tab, setTab] = useState<TabType>('dashboard');
@@ -178,6 +179,7 @@ export default function AdminClient({ adminName, username }: Props) {
             { key: 'closing_data', label: '마감자료', icon: FileText },
             { key: 'purchase_history', label: '총 구매내역', icon: BarChart2 },
             { key: 'columns', label: '칼럼 이력', icon: History },
+            { key: 'test_mapping', label: '시험품목/항목', icon: FlaskConical },
           ].map(({ key, label, icon: Icon, badge }) => (
             <button
               key={key}
@@ -320,6 +322,11 @@ export default function AdminClient({ adminName, username }: Props) {
         {/* 칼럼 이력 */}
         {tab === 'columns' && (
           <IndividualColumnTab columns={columns} />
+        )}
+
+        {/* 시험품목/항목 (칼럼 마스터) */}
+        {tab === 'test_mapping' && (
+          <TestMappingTab columns={columns} />
         )}
       </main>
 

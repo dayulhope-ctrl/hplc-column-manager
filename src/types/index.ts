@@ -51,6 +51,19 @@ export interface IndividualColumn {
   notes: string | null;
 }
 
+// 칼럼 마스터: 시험품목/항목 매핑 (LIMS 연동 기초)
+export interface ColumnTestMapping {
+  id: string;
+  model_id: string | null;
+  cat_no: string | null;
+  product_name: string;
+  test_item: string | null;
+  source: string | null;
+  created_at: string;
+  // Join
+  column_models?: Partial<ColumnModel>;
+}
+
 // 구매 요청
 export interface PurchaseRequest {
   id: string;
