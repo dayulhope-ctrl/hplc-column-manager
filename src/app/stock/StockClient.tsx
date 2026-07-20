@@ -106,7 +106,6 @@ export default function StockClient() {
           <ColumnTable
             columns={filtered}
             isAdmin={false}
-            usageMap={{}}
           />
         )}
       </div>

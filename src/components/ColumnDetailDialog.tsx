@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Plus, Trash2, Pencil, Minus, FlaskConical } from 'lucide-react';
+import { X, Plus, Trash2, Minus, FlaskConical } from 'lucide-react';
 import { ColumnModel, IndividualColumn } from '@/types';
 
 interface RecordWithModel extends IndividualColumn {
@@ -10,9 +10,9 @@ interface RecordWithModel extends IndividualColumn {
 
 interface Props {
   column: ColumnModel;
+  mappings?: { product_name: string; test_item: string | null }[];
   onClose: () => void;
   onStockChanged?: () => void;
-  onProductsChanged?: () => void;
   isAdmin?: boolean;
 }
 
@@ -23,17 +23,24 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   '입고 예정': { label: '입고 예정', className: 'bg-amber-100 text-amber-800' },
 };
 
-export default function ColumnDetailDialog({ column, onClose, onStockChanged, onProductsChanged, isAdmin = true }: Props) {
+export default function ColumnDetailDialog({ column, mappings = [], onClose, onStockChanged, isAdmin = true }: Props) {
   const [records, setRecords] = useState<RecordWithModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [stockDelta, setStockDelta] = useState(0);
   const [showAddForm, setShowAddForm] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [products, setProducts] = useState<string[]>(column.products_used || []);
-  const [editingProducts, setEditingProducts] = useState(false);
-  const [productsText, setProductsText] = useState((column.products_used || []).join('\n'));
-  const [savingProducts, setSavingProducts] = useState(false);
+
+  // 시험품목별 시험항목 그룹핑 (칼럼 마스터 출처)
+  const productGroups: { product: string; items: string[] }[] = (() => {
+    const map = new Map<string, string[]>();
+    for (const m of mappings) {
+      const key = m.product_name || '(미상)';
+      if (!map.has(key)) map.set(key, []);
+      if (m.test_item) map.get(key)!.push(m.test_item);
+    }
+    return [...map.entries()].map(([product, items]) => ({ product, items }));
+  })();
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -72,25 +79,6 @@ export default function ColumnDetailDialog({ column, onClose, onStockChanged, on
     if (res.ok) { fetchRecords(); setMessage({ type: 'success', text: '삭제되었습니다' }); }
     else setMessage({ type: 'error', text: '삭제 실패' });
     setDeleting(null);
-  };
-
-  const handleSaveProducts = async () => {
-    setSavingProducts(true);
-    const updated = productsText.split('\n').map(s => s.trim()).filter(Boolean);
-    const res = await fetch(`/api/columns/${column.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ products_used: updated }),
-    });
-    setSavingProducts(false);
-    if (res.ok) {
-      setProducts(updated);
-      setEditingProducts(false);
-      setMessage({ type: 'success', text: '사용 제품 목록이 저장되었습니다' });
-      onProductsChanged?.();
-    } else {
-      setMessage({ type: 'error', text: '저장 실패' });
-    }
   };
 
   const currentStock = column.total_stock + stockDelta;
@@ -163,56 +151,41 @@ export default function ColumnDetailDialog({ column, onClose, onStockChanged, on
             </div>
           </div>
 
-          {/* 사용 제품 목록 */}
+          {/* 시험품목 / 항목 (칼럼 마스터) */}
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b">
               <span className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
-                <FlaskConical className="w-3.5 h-3.5" /> 사용 제품 목록 (툴팁 표시용)
+                <FlaskConical className="w-3.5 h-3.5" /> 시험품목 / 항목
               </span>
-              {isAdmin && !editingProducts && (
-                <button
-                  onClick={() => { setProductsText(products.join('\n')); setEditingProducts(true); }}
-                  className="p-1 hover:bg-gray-200 rounded text-gray-500"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
+              {productGroups.length > 0 && (
+                <span className="text-xs text-gray-400">{productGroups.length}개 품목</span>
               )}
             </div>
-            {editingProducts ? (
-              <div className="p-3 space-y-2">
-                <textarea
-                  value={productsText}
-                  onChange={e => setProductsText(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={5}
-                  placeholder={"에너지비타500맥스액\n이뮤셉트캡슐\n마이레놀정"}
-                  autoFocus
-                />
-                <p className="text-xs text-gray-400">한 줄에 제품명 하나씩 입력</p>
-                <div className="flex gap-2">
-                  <button onClick={() => setEditingProducts(false)} className="flex-1 py-1.5 border rounded-lg text-sm">취소</button>
-                  <button onClick={handleSaveProducts} disabled={savingProducts}
-                    className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50">
-                    {savingProducts ? '저장 중...' : '저장'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="px-4 py-3">
-                {products.length === 0 ? (
-                  <p className="text-xs text-gray-400">등록된 제품 없음{isAdmin ? ' — 연필 아이콘을 눌러 추가하세요' : ''}</p>
-                ) : (
-                  <ul className="space-y-1">
-                    {products.map((p, i) => (
-                      <li key={i} className="text-xs text-gray-700 flex items-center gap-1.5">
-                        <span className="w-4 h-4 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold shrink-0">{i + 1}</span>
-                        {p}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
+            <div className="px-4 py-3">
+              {productGroups.length === 0 ? (
+                <p className="text-xs text-gray-400">등록된 시험품목/항목 없음</p>
+              ) : (
+                <ul className="space-y-2">
+                  {productGroups.map((g, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="w-4 h-4 mt-0.5 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold shrink-0">{i + 1}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-800">{g.product}</p>
+                        {g.items.length > 0 && (
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {g.items.map((item, j) => (
+                              <span key={j} className="inline-flex px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[11px]">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
           {/* 이력 추가 버튼 */}

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 // 칼럼 마스터: 시험품목/항목 매핑 조회
 //   ?product=검색어   → 시험품목 부분일치
 //   ?test_item=검색어 → 시험항목 부분일치

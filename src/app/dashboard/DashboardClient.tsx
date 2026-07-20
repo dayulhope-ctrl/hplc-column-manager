@@ -71,7 +71,7 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
   const [receivings, setReceivings] = useState<ReceivingRecord[]>([]);
   const [closings, setClosings] = useState<MonthlyClosing[]>([]);
   const [chartData, setChartData] = useState<any>(null);
-  const [usageMap, setUsageMap] = useState<Record<string, string[]>>({});
+  const [mappingMap, setMappingMap] = useState<Record<string, { product_name: string; test_item: string | null }[]>>({});
   const [detailColumn, setDetailColumn] = useState<ColumnModel | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string>('all');
@@ -83,14 +83,14 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [colRes, statsRes, reqRes, recRes, chartRes, closingRes, uhRes] = await Promise.all([
+      const [colRes, statsRes, reqRes, recRes, chartRes, closingRes, mapRes] = await Promise.all([
         fetch('/api/columns'),
         fetch('/api/stats'),
         fetch('/api/requests'),
         fetch('/api/receivings'),
         fetch('/api/stats/charts'),
         fetch('/api/closings'),
-        fetch('/api/usage-history'),
+        fetch('/api/test-mappings'),
       ]);
       setColumns((await colRes.json()).columns || []);
       setStats((await statsRes.json()).stats);
@@ -99,17 +99,16 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
       const cd = await chartRes.json();
       setChartData(cd);
       setClosings((await closingRes.json()).closings || []);
-      // usage_history → column_model_id별 product_name 목록 Map 생성
-      const uhRecords = (await uhRes.json()).records || [];
-      const map: Record<string, string[]> = {};
-      uhRecords.forEach((r: any) => {
-        if (r.column_model_id && r.product_name) {
-          if (!map[r.column_model_id]) map[r.column_model_id] = [];
-          if (!map[r.column_model_id].includes(r.product_name))
-            map[r.column_model_id].push(r.product_name);
+      // column_test_mappings → model_id별 {시험품목, 시험항목} 목록 Map 생성
+      const mrows = (await mapRes.json()).mappings || [];
+      const mm: Record<string, { product_name: string; test_item: string | null }[]> = {};
+      mrows.forEach((r: any) => {
+        if (r.model_id) {
+          if (!mm[r.model_id]) mm[r.model_id] = [];
+          mm[r.model_id].push({ product_name: r.product_name, test_item: r.test_item });
         }
       });
-      setUsageMap(map);
+      setMappingMap(mm);
     } catch (e) {
       console.error(e);
     } finally {
@@ -305,7 +304,7 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
                   columns={filteredColumns}
                   onRequestPurchase={(col) => requireName(() => setSelectedColumn(col))}
                   onRowClick={setDetailColumn}
-                  usageMap={usageMap}
+                  mappingMap={mappingMap}
                 />
               )}
             </div>
@@ -365,6 +364,7 @@ export default function DashboardClient({ userName: initialUserName, isAdmin }: 
       {detailColumn && (
         <ColumnDetailDialog
           column={detailColumn}
+          mappings={mappingMap[detailColumn.id] || []}
           onClose={() => setDetailColumn(null)}
           isAdmin={false}
         />

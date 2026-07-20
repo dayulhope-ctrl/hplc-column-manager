@@ -173,11 +173,11 @@ interface ColumnTableProps {
   onEdit?: (column: ColumnModel) => void;
   onDelete?: (column: ColumnModel) => void;
   onRowClick?: (column: ColumnModel) => void;
-  usageMap?: Record<string, string[]>;
+  mappingMap?: Record<string, { product_name: string; test_item: string | null }[]>;
 }
 
 
-export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdit, onDelete, onRowClick, usageMap }: ColumnTableProps) {
+export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdit, onDelete, onRowClick, mappingMap }: ColumnTableProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
@@ -324,7 +324,7 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
                         <div
                           className="inline-block"
                           onMouseEnter={(e) => {
-                            if (usageMap?.[col.id]?.length) {
+                            if (mappingMap?.[col.id]?.length) {
                               const rect = e.currentTarget.getBoundingClientRect();
                               setTooltipPos({ x: rect.left, y: rect.bottom + 6 });
                               setHoveredId(col.id);
@@ -408,16 +408,19 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
         </table>
       </div>
 
-      {/* 사용 제품 목록 툴팁 */}
-      {hoveredId && usageMap?.[hoveredId]?.length ? (
+      {/* 시험품목/항목 툴팁 (칼럼 마스터) */}
+      {hoveredId && mappingMap?.[hoveredId]?.length ? (
         <div
-          className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl p-3 min-w-[180px] max-w-[260px] pointer-events-none"
+          className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl p-3 min-w-[200px] max-w-[300px] pointer-events-none"
           style={{ left: tooltipPos.x, top: tooltipPos.y }}
         >
-          <p className="text-xs font-semibold text-gray-500 mb-1.5">사용 제품 목록</p>
+          <p className="text-xs font-semibold text-gray-500 mb-1.5">시험품목 / 항목</p>
           <ul className="space-y-0.5">
-            {usageMap[hoveredId].map((name, i) => (
-              <li key={i} className="text-xs text-gray-700">{i + 1}. {name}</li>
+            {mappingMap[hoveredId].map((m, i) => (
+              <li key={i} className="text-xs text-gray-700">
+                {i + 1}. {m.product_name}
+                {m.test_item ? <span className="text-gray-400"> — {m.test_item}</span> : null}
+              </li>
             ))}
           </ul>
         </div>
