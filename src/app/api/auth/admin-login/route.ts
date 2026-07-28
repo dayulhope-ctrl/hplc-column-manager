@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       name: admin.name,
     });
 
-    // 쿠키 설정 (30분)
+    // 쿠키 설정 (30일)
     cookies().set('session_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

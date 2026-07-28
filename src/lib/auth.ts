@@ -5,7 +5,7 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'default-secret-please-change-in-production-32chars'
 );
 
-const ADMIN_SESSION_DURATION = 30 * 60; // 30분
+const ADMIN_SESSION_DURATION = 30 * 24 * 60 * 60; // 30일 (자동 로그아웃 사실상 해제)
 const USER_SESSION_DURATION = 8 * 60 * 60; // 8시간
 
 export interface AdminTokenPayload {

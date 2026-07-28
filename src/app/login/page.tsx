@@ -99,7 +99,7 @@ export default function AdminLoginPage() {
               {loading ? '로그인 중...' : '관리자 로그인'}
             </button>
             <p className="text-xs text-gray-400 text-center">
-              세션은 30분 후 자동 만료됩니다
+              로그인 상태가 유지됩니다 (로그아웃 버튼으로 종료)
             </p>
           </form>
         </div>
