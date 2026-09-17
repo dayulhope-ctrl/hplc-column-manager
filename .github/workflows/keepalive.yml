@@ -1,0 +1,26 @@
+name: Supabase Keep-Alive
+
+# 무료 요금제 Supabase 프로젝트가 7일 무활동 시 자동 일시정지되는 것을 방지.
+# 3일마다 배포된 앱의 공개 API(/api/columns)를 호출 → DB 조회 발생 → 활동 타이머 리셋.
+# 비밀키 불필요 (공개 엔드포인트).
+
+on:
+  schedule:
+    - cron: '0 0 */3 * *'   # 3일마다 00:00 UTC (7일 한계 대비 여유)
+  workflow_dispatch:          # 필요 시 수동 실행
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping DB via app API
+        run: |
+          URL="https://hplc-column-manager.vercel.app/api/columns"
+          echo "Pinging $URL"
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$URL")
+          echo "HTTP status: $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::예상치 못한 응답 코드 $code — keep-alive 실패"
+            exit 1
+          fi
+          echo "Keep-alive 성공 (DB 활동 발생)"
