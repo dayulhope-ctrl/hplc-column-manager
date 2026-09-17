@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 const ANNUAL_BUDGET = 80_000_000; // 연간 예산 8천만원
 
 export async function GET() {
