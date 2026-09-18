@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ShoppingCart, Search, Plus, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Search, Plus, CheckCircle, ClipboardList } from 'lucide-react';
 import { PurchaseRequest } from '@/types';
 import RequestsPanel from '@/components/RequestsPanel';
 
@@ -214,6 +214,7 @@ export default function RequestPage() {
   const [view, setView]         = useState<'form' | 'history'>('form');
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [loadingReq, setLoadingReq] = useState(false);
+  const [justSubmitted, setJustSubmitted] = useState(false);
 
   const fetchRequests = async () => {
     setLoadingReq(true);
@@ -228,8 +229,15 @@ export default function RequestPage() {
   // 폼 제출 성공 시 내역 화면으로 전환
   const handleSaved = async () => {
     await fetchRequests();
+    setJustSubmitted(true);
     setView('history');
   };
+
+  // URL ?view=history 로 진입 시 바로 내역 화면 (랜딩 '구매요청 내역' 카드용)
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('view');
+    if (v === 'history') setView('history');
+  }, []);
 
   // 내역 화면으로 초기 진입 시 데이터 로딩
   useEffect(() => {
@@ -254,15 +262,25 @@ export default function RequestPage() {
             </h1>
           </div>
 
-          {/* 내역 화면에서: 추가 요청 버튼 */}
-          {view === 'history' && (
+          {/* 폼 / 내역 토글 (항상 표시) */}
+          <div className="ml-auto flex gap-1 border border-gray-200 rounded-lg p-0.5 bg-gray-50">
             <button
-              onClick={() => setView('form')}
-              className="ml-auto px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm flex items-center gap-1.5 hover:bg-green-700 transition-colors"
+              onClick={() => { setJustSubmitted(false); setView('form'); }}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                view === 'form' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              <Plus className="w-4 h-4" /> 추가 요청
+              <Plus className="w-4 h-4" /> 요청 작성
             </button>
-          )}
+            <button
+              onClick={() => setView('history')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                view === 'history' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" /> 요청 내역
+            </button>
+          </div>
         </div>
       </div>
 
@@ -277,14 +295,16 @@ export default function RequestPage() {
           </>
         ) : (
           <>
-            {/* 제출 직후 안내 배너 */}
-            <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4 flex items-center gap-3 mb-6">
-              <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-green-800">구매요청이 접수되었습니다</p>
-                <p className="text-xs text-green-600 mt-0.5">관리자 검토 후 승인 처리됩니다. 아래에서 요청 현황을 확인하세요.</p>
+            {/* 제출 직후에만 안내 배너 */}
+            {justSubmitted && (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4 flex items-center gap-3 mb-6">
+                <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-green-800">구매요청이 접수되었습니다</p>
+                  <p className="text-xs text-green-600 mt-0.5">관리자 검토 후 승인 처리됩니다. 아래에서 요청 현황을 확인하세요.</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {loadingReq ? (
               <div className="text-center py-16 text-gray-400">데이터를 불러오는 중...</div>

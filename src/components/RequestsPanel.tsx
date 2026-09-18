@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Download, Plus, ShoppingCart, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Download, Plus, ShoppingCart, Trash2, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import PurchaseRequestAddDialog from '@/components/PurchaseRequestAddDialog';
 import { PurchaseRequest } from '@/types';
 
@@ -38,10 +38,21 @@ export default function RequestsPanel({
   const [showAdd, setShowAdd] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
+  const [query, setQuery] = useState('');
 
   // 관리자 직접 발주(is_admin_direct=true)는 구매요청 탭에서 완전히 제외
   // → 해당 항목은 입고확인 탭에서만 관리
-  const teamRequests = requests.filter(r => !r.is_admin_direct);
+  const teamRequests = useMemo(() => {
+    const base = requests.filter(r => !r.is_admin_direct);
+    const q = query.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter(r =>
+      (r.requested_by || '').toLowerCase().includes(q) ||
+      (r.column_models?.model_name || '').toLowerCase().includes(q) ||
+      (r.column_models?.cat_no || '').toLowerCase().includes(q) ||
+      (r.reason || '').toLowerCase().includes(q)
+    );
+  }, [requests, query]);
 
   const pending    = teamRequests.filter(r => r.status === 'pending');
   const inProgress = teamRequests.filter(r => ['approved', 'ordered'].includes(r.status));
@@ -171,6 +182,23 @@ export default function RequestsPanel({
         </div>
       </div>
 
+      {/* 검색 (요청자 / 모델명 / 사유) */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="요청자 이름, 모델명, 요청사유로 검색... (예: 본인 이름)"
+          className="w-full pl-10 pr-9 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        {query && (
+          <button onClick={() => setQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {/* ── 섹션 1: 승인 대기 ── */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
@@ -204,9 +232,9 @@ export default function RequestsPanel({
             <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
             입고 완료
             <span className="text-xs font-normal text-green-700 bg-green-50 px-2 py-0.5 rounded-full">{completed.length}건</span>
-            {showCompleted ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            {(showCompleted || !!query.trim()) ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
-          {showCompleted && (
+          {(showCompleted || !!query.trim()) && (
             <RequestTable rows={completed} showApproveBtn={false} showDeleteBtn={false} />
           )}
         </div>
@@ -222,9 +250,9 @@ export default function RequestsPanel({
             <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
             거부됨
             <span className="text-xs font-normal text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{rejected.length}건</span>
-            {showRejected ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            {(showRejected || !!query.trim()) ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
-          {showRejected && (
+          {(showRejected || !!query.trim()) && (
             <RequestTable rows={rejected} showApproveBtn={false} showDeleteBtn={isAdmin} />
           )}
         </div>

@@ -1,7 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { Package, ShoppingCart, Lock } from 'lucide-react';
+import { Package, ShoppingCart, Lock, ClipboardList } from 'lucide-react';
 
 const CARDS = [
   {
@@ -25,6 +24,16 @@ const CARDS = [
     btn: 'bg-green-600 hover:bg-green-700',
   },
   {
+    icon: ClipboardList,
+    title: '구매요청 내역',
+    desc: '내가 요청한 내역과 사유를 확인합니다',
+    href: '/request?view=history',
+    iconBg: 'bg-amber-100',
+    iconColor: 'text-amber-600',
+    border: 'border-amber-100 hover:border-amber-300',
+    btn: 'bg-amber-500 hover:bg-amber-600',
+  },
+  {
     icon: Lock,
     title: '관리자 모드',
     desc: '관리자 전용 로그인이 필요합니다',
@@ -37,8 +46,6 @@ const CARDS = [
 ];
 
 export default function LandingPage() {
-  const router = useRouter();
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex flex-col items-center justify-center px-4 py-12">
       {/* 헤더 */}
@@ -51,12 +58,12 @@ export default function LandingPage() {
       </div>
 
       {/* 카드 3개 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-5xl">
         {CARDS.map(({ icon: Icon, title, desc, href, iconBg, iconColor, border, btn }) => (
-          <button
+          <a
             key={href}
-            onClick={() => router.push(href)}
-            className={`bg-white rounded-2xl border-2 ${border} shadow-sm hover:shadow-md transition-all duration-200 p-8 flex flex-col items-center text-center group cursor-pointer`}
+            href={href}
+            className={`bg-white rounded-2xl border-2 ${border} shadow-sm hover:shadow-md transition-all duration-200 p-8 flex flex-col items-center text-center group cursor-pointer no-underline`}
           >
             <div className={`w-16 h-16 rounded-2xl ${iconBg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200`}>
               <Icon className={`w-8 h-8 ${iconColor}`} />
@@ -66,7 +73,7 @@ export default function LandingPage() {
             <span className={`px-5 py-2 ${btn} text-white text-sm font-medium rounded-xl transition-colors`}>
               {title} →
             </span>
-          </button>
+          </a>
         ))}
       </div>
 
