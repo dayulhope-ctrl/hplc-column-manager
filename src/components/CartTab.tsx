@@ -280,11 +280,12 @@ export default function CartTab({
         )
         .map(col => makeDirectItem(col, 'low_stock'));
 
-      // localStorage 복원 direct 항목 중 구매요청 있는 것 또는 purchase_status 있는 것 제거
+      // localStorage 복원 direct 항목 중 구매요청 있는 것, purchase_status 있는 것, 재고 > 0인 것 제거
       const filteredDirectItems = directItems.filter(i => {
         if (activeRequestColIds.has(i.columnModelId!)) return false;
         const col = columns.find(c => c.id === i.columnModelId);
         if (col?.purchase_status) return false;
+        if (col && col.total_stock > 0) return false;
         return true;
       });
 
@@ -399,17 +400,28 @@ export default function CartTab({
           .filter(r => ['pending', 'approved'].includes(r.status))
           .map(r => r.column_model_id)
       );
+      // 재고가 보충된 low_stock 항목 제거
+      const replenished = prev.filter(item => {
+        if (item.origin !== 'low_stock') return false;
+        const col = columns.find(c => c.id === item.columnModelId);
+        return col ? col.total_stock > 0 : false;
+      });
+      const cleaned = replenished.length > 0
+        ? prev.filter(item => !replenished.includes(item))
+        : prev;
+
+      const cleanedColIds = new Set(cleaned.map(i => i.columnModelId).filter(Boolean));
       const newItems = columns
         .filter(c =>
           c.total_stock === 0 &&
           c.min_safety_stock > 0 &&           // ← 최소 안전재고 0이면 자동 추가 안 함
           !c.purchase_status &&
-          !existingColIds.has(c.id) &&
+          !cleanedColIds.has(c.id) &&
           !manuallyRemovedIds.has(c.id) &&
           !activeColIds.has(c.id)
         )
         .map(col => makeDirectItem(col, 'low_stock'));
-      return newItems.length > 0 ? [...prev, ...newItems] : prev;
+      return (replenished.length > 0 || newItems.length > 0) ? [...cleaned, ...newItems] : prev;
     });
   }, [columns, initialized, manuallyRemovedIds, approvedRequests, allRequests]);
 
