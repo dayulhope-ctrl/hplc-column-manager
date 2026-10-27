@@ -524,6 +524,7 @@ export default function CartTab({
   };
 
   const availableToAdd = columns.filter(col =>
+    col.total_stock === 0 &&
     !unifiedCart.some(i => i.columnModelId === col.id) &&
     (searchQuery === '' ||
       col.model_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
