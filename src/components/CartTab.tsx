@@ -33,6 +33,7 @@ interface Props {
   allRequests?: PurchaseRequest[];
   adminName?: string;
   onOrderCompleted?: () => void;
+  onCartCountChange?: (count: number) => void;
   isAdmin?: boolean;
 }
 
@@ -98,7 +99,7 @@ function makeApprovedItem(r: PurchaseRequest): UnifiedCartItem {
 }
 
 export default function CartTab({
-  columns, approvedRequests, allRequests, adminName, onOrderCompleted, isAdmin = true,
+  columns, approvedRequests, allRequests, adminName, onOrderCompleted, onCartCountChange, isAdmin = true,
 }: Props) {
   const [unifiedCart, setUnifiedCart] = useState<UnifiedCartItem[]>([]);
   const [initialized, setInitialized]   = useState(false);
@@ -205,6 +206,10 @@ export default function CartTab({
       }));
     localStorage.setItem(CART_KEY, JSON.stringify(data));
   }, [unifiedCart, initialized]);
+
+  useEffect(() => {
+    onCartCountChange?.(unifiedCart.length);
+  }, [unifiedCart.length, onCartCountChange]);
 
   // ── 초기화: localStorage 복원 + 재고 0 자동 추가 ──
   useEffect(() => {
