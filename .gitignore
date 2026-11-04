@@ -29,3 +29,7 @@ Thumbs.db
 next-env.d.ts
 
 .vercel
+
+# axhub import: local agent runtime state
+.axhub/
+.claude/

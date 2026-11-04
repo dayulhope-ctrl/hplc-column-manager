@@ -18,7 +18,53 @@
       "Bash(find \"C:\\\\Users\\\\user\\\\Desktop\\\\다운로드\\\\column-companion-extracted\\\\src\" -name \"*.tsx\" -o -name \"*.ts\" | head -30)",
       "Bash(npx next *)",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git branch *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(npx vercel *)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "mcp__d9960f65-27f3-4f86-8b2c-30908396bc09__list_projects",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\user\\\\Downloads\\\\hplc-system\\\\hplc-system\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(xargs grep -l \"products_used\")",
+      "Bash(git commit *)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\user\\\\Downloads\\\\hplc-system\\\\hplc-system\\\\src\\\\app\\\\api\\\\export\\\\columns-master\")",
+      "Bash(cd \"C:\\\\Users\\\\user\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\46182a7c-0d0a-4791-9ad2-fd3bd1069b19\\\\899c8830-1fa1-4391-a45a-fbf707c8b0d1\\\\skills\\\\xlsx\" && ls outputs/)",
+      "Read(//c/Users/user/AppData/**)",
+      "Bash(python -)",
+      "PowerShell(Start-Process \"C:\\\\Users\\\\user\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\46182a7c-0d0a-4791-9ad2-fd3bd1069b19\\\\899c8830-1fa1-4391-a45a-fbf707c8b0d1\\\\skills\\\\xlsx\\\\outputs\\\\Į��������_����ǰ��_20260708.xlsx\")",
+      "PowerShell(explorer \"C:\\\\Users\\\\user\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\46182a7c-0d0a-4791-9ad2-fd3bd1069b19\\\\899c8830-1fa1-4391-a45a-fbf707c8b0d1\\\\skills\\\\xlsx\\\\outputs\")",
+      "Bash(node scripts/import_test_mappings.mjs)",
+      "Bash(echo \"=== EXIT: $? ===\")",
+      "Bash(node -e ' *)",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__navigate",
+      "mcp__claude-in-chrome__computer",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(git reset *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git push 2>$null; $true",
+            "if": "Bash(git commit *)",
+            "shell": "powershell",
+            "timeout": 30,
+            "statusMessage": "GitHub에 자동 push 중..."
+          }
+        ]
+      }
     ]
   }
 }

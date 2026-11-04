@@ -1,0 +1,25 @@
+version: axhub/v1
+name: hplc-column-manager
+
+runtime:
+  port: 3000
+  health_path: /
+
+build:
+  framework: nextjs
+  install: npm ci
+  build: npm run build
+  start: npm run start
+  deploy_method: docker
+
+env:
+  required:
+    - name: NEXT_PUBLIC_SUPABASE_URL
+    - name: SUPABASE_SERVICE_ROLE_KEY
+    - name: JWT_SECRET
+    - name: ADMIN_USERNAME
+    - name: ADMIN_PASSWORD
+  optional:
+    - name: TELEGRAM_BOT_TOKEN
+    - name: TELEGRAM_CHAT_ID
+    - name: ALLOWED_IPS
