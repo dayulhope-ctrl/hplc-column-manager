@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/:path*",
+      "destination": "https://hplc-column-manager.kwangdong.axhub.ai/:path*",
+      "permanent": false
+    }
+  ]
+}
