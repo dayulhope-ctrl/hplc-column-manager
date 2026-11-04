@@ -12,6 +12,9 @@ build:
   start: npm run start
   deploy_method: docker
 
+database:
+  engine: postgres
+
 env:
   required:
     - name: NEXT_PUBLIC_SUPABASE_URL
@@ -23,3 +26,4 @@ env:
     - name: TELEGRAM_BOT_TOKEN
     - name: TELEGRAM_CHAT_ID
     - name: ALLOWED_IPS
+    - name: RESYNC_FROM_SUPABASE
