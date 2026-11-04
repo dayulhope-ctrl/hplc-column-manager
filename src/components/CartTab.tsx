@@ -33,6 +33,7 @@ interface Props {
   allRequests?: PurchaseRequest[];
   adminName?: string;
   onOrderCompleted?: () => void;
+  onCartCountChange?: (count: number) => void;
   isAdmin?: boolean;
 }
 
@@ -98,7 +99,7 @@ function makeApprovedItem(r: PurchaseRequest): UnifiedCartItem {
 }
 
 export default function CartTab({
-  columns, approvedRequests, allRequests, adminName, onOrderCompleted, isAdmin = true,
+  columns, approvedRequests, allRequests, adminName, onOrderCompleted, onCartCountChange, isAdmin = true,
 }: Props) {
   const [unifiedCart, setUnifiedCart] = useState<UnifiedCartItem[]>([]);
   const [initialized, setInitialized]   = useState(false);
@@ -206,6 +207,10 @@ export default function CartTab({
     localStorage.setItem(CART_KEY, JSON.stringify(data));
   }, [unifiedCart, initialized]);
 
+  useEffect(() => {
+    onCartCountChange?.(unifiedCart.length);
+  }, [unifiedCart.length, onCartCountChange]);
+
   // ── 초기화: localStorage 복원 + 재고 0 자동 추가 ──
   useEffect(() => {
     if (columns.length === 0 || initialized) return;
@@ -280,11 +285,12 @@ export default function CartTab({
         )
         .map(col => makeDirectItem(col, 'low_stock'));
 
-      // localStorage 복원 direct 항목 중 구매요청 있는 것 또는 purchase_status 있는 것 제거
+      // localStorage 복원 direct 항목 중 구매요청 있는 것, purchase_status 있는 것, 재고 > 0인 것 제거
       const filteredDirectItems = directItems.filter(i => {
         if (activeRequestColIds.has(i.columnModelId!)) return false;
         const col = columns.find(c => c.id === i.columnModelId);
         if (col?.purchase_status) return false;
+        if (col && col.total_stock > 0) return false;
         return true;
       });
 
@@ -399,17 +405,28 @@ export default function CartTab({
           .filter(r => ['pending', 'approved'].includes(r.status))
           .map(r => r.column_model_id)
       );
+      // 재고가 보충된 low_stock 항목 제거
+      const replenished = prev.filter(item => {
+        if (item.origin !== 'low_stock') return false;
+        const col = columns.find(c => c.id === item.columnModelId);
+        return col ? col.total_stock > 0 : false;
+      });
+      const cleaned = replenished.length > 0
+        ? prev.filter(item => !replenished.includes(item))
+        : prev;
+
+      const cleanedColIds = new Set(cleaned.map(i => i.columnModelId).filter(Boolean));
       const newItems = columns
         .filter(c =>
           c.total_stock === 0 &&
           c.min_safety_stock > 0 &&           // ← 최소 안전재고 0이면 자동 추가 안 함
           !c.purchase_status &&
-          !existingColIds.has(c.id) &&
+          !cleanedColIds.has(c.id) &&
           !manuallyRemovedIds.has(c.id) &&
           !activeColIds.has(c.id)
         )
         .map(col => makeDirectItem(col, 'low_stock'));
-      return newItems.length > 0 ? [...prev, ...newItems] : prev;
+      return (replenished.length > 0 || newItems.length > 0) ? [...cleaned, ...newItems] : prev;
     });
   }, [columns, initialized, manuallyRemovedIds, approvedRequests, allRequests]);
 
@@ -524,6 +541,7 @@ export default function CartTab({
   };
 
   const availableToAdd = columns.filter(col =>
+    col.total_stock === 0 &&
     !unifiedCart.some(i => i.columnModelId === col.id) &&
     (searchQuery === '' ||
       col.model_name.toLowerCase().includes(searchQuery.toLowerCase()) ||

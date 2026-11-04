@@ -37,6 +37,7 @@ export default function AdminClient({ adminName, username }: Props) {
   const [receivings, setReceivings] = useState<ReceivingRecord[]>([]);
   const [closings, setClosings] = useState<MonthlyClosing[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [cartCount, setCartCount] = useState(0);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -173,7 +174,7 @@ export default function AdminClient({ adminName, username }: Props) {
           {[
             { key: 'dashboard', label: '대시보드', icon: Package },
             { key: 'requests', label: '구매 요청', icon: ClipboardList, badge: pendingRequests.length },
-            { key: 'cart', label: '장바구니', icon: ShoppingCart },
+            { key: 'cart', label: '장바구니', icon: ShoppingCart, badge: cartCount },
             { key: 'receiving', label: '입고 확인', icon: CheckCircle, badge: orderedRequests.length },
             { key: 'closing_data', label: '마감자료', icon: FileText },
             { key: 'purchase_history', label: '총 구매내역', icon: BarChart2 },
@@ -288,6 +289,7 @@ export default function AdminClient({ adminName, username }: Props) {
             allRequests={requests}
             adminName={adminName || username}
             onOrderCompleted={fetchData}
+            onCartCountChange={setCartCount}
           />
         </div>
 
