@@ -9,12 +9,29 @@ const LS_TYPE_KEY = 'hplc_column_type_tab';
 type TypeTab = 'all' | 'LC' | 'GC';
 const typeOf = (c: ColumnModel): 'LC' | 'GC' => (c.column_type === 'GC' ? 'GC' : 'LC');
 
-function parseSize(size: string | null | undefined): { length: number | null; inner: number | null } {
-  if (!size) return { length: null, inner: null };
-  const nums = size.match(/[\d.]+/g);
-  if (!nums || nums.length < 2) return { length: Number(nums?.[0]) || null, inner: null };
-  return { length: Number(nums[1]), inner: Number(nums[0]) };
+// 사이즈 글자에서 길이·내경 읽기
+// - 적힌 순서와 상관없이 큰 숫자 = 길이, 작은 숫자 = 내경 (칼럼은 항상 길이가 내경보다 길다)
+//   예) 4.6mm × 250mm, 150 x 4.6 mm, 30m X 0.25mm, 0.32 x 30
+// - 길이 단위: 숫자 바로 뒤가 m(mm 아님)이면 m, GC 칼럼이면 m, 그 외 mm
+// - lengthKey 는 필터·표시용 문자열 ("250 mm", "30 m")
+function parseSize(
+  size: string | null | undefined,
+  type: 'LC' | 'GC' = 'LC'
+): { length: number | null; inner: number | null; lengthUnit: 'mm' | 'm'; lengthKey: string | null } {
+  const empty = { length: null, inner: null, lengthUnit: 'mm' as const, lengthKey: null };
+  if (!size) return empty;
+  const nums = (size.match(/\d+(?:\.\d+)?/g) || []).map(Number).filter(n => n > 0);
+  if (nums.length < 2) return empty;
+  const length = Math.max(nums[0], nums[1]);
+  const inner = Math.min(nums[0], nums[1]);
+  const meterInText = /\d\s*m(?!m)/i.test(size);
+  const lengthUnit: 'mm' | 'm' = meterInText || type === 'GC' ? 'm' : 'mm';
+  return { length, inner, lengthUnit, lengthKey: `${length} ${lengthUnit}` };
 }
+const lengthKeyToMm = (k: string) => {
+  const [n, u] = k.split(' ');
+  return Number(n) * (u === 'm' ? 1000 : 1);
+};
 
 // ── 엑셀 스타일 다중 선택 필터 컴포넌트 ──
 interface MultiSelectFilterProps {
@@ -216,7 +233,8 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
       const f = localStorage.getItem(LS_FILTER_KEY);
       if (f) {
         const { lengths, inners, particles } = JSON.parse(f);
-        if (Array.isArray(lengths))   setFilterLengths(new Set(lengths));
+        // 예전 저장값("250"처럼 단위 없음)은 버린다
+        if (Array.isArray(lengths))   setFilterLengths(new Set(lengths.filter((v: unknown) => typeof v === 'string' && /\s(mm|m)$/.test(v))));
         if (Array.isArray(inners))    setFilterInners(new Set(inners));
         if (Array.isArray(particles)) setFilterParticles(new Set(particles));
       }
@@ -240,8 +258,8 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
 
   // 필터 드롭다운 고유값 (props.columns 전체 기준, 숫자 오름차순)
   const uniqueLengths = useMemo(() =>
-    [...new Set(columns.map(c => parseSize(c.size).length).filter((v): v is number => v !== null))]
-      .sort((a, b) => a - b).map(String),
+    [...new Set(columns.map(c => parseSize(c.size, typeOf(c)).lengthKey).filter((v): v is string => v !== null))]
+      .sort((a, b) => lengthKeyToMm(a) - lengthKeyToMm(b)),
     [columns]
   );
   const uniqueInners = useMemo(() =>
@@ -259,7 +277,7 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
   const processedColumns = useMemo(() => {
     let result = columns;
     if (filterLengths.size > 0)
-      result = result.filter(c => { const l = parseSize(c.size).length; return l !== null && filterLengths.has(String(l)); });
+      result = result.filter(c => { const k = parseSize(c.size, typeOf(c)).lengthKey; return k !== null && filterLengths.has(k); });
     if (filterInners.size > 0)
       result = result.filter(c => { const i = parseSize(c.size).inner; return i !== null && filterInners.has(String(i)); });
     if (filterParticles.size > 0)
@@ -292,11 +310,10 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
         <span className="text-xs font-medium text-gray-500">필터:</span>
 
         <MultiSelectFilter
-          label="길이(mm)"
+          label="길이"
           options={uniqueLengths}
           selected={filterLengths}
           onApply={setFilterLengths}
-          formatOption={v => `${v} mm`}
         />
         <MultiSelectFilter
           label="내경(mm)"
@@ -335,7 +352,7 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
               <th className="px-3 py-3 text-center">종류</th>
               <th className="px-4 py-3 text-left">모델명</th>
               <th className="px-4 py-3 text-left">Cat. No</th>
-              <th className="px-4 py-3 text-center hidden md:table-cell">길이(MM)</th>
+              <th className="px-4 py-3 text-center hidden md:table-cell">길이</th>
               <th className="px-4 py-3 text-center hidden md:table-cell">내경(MM)</th>
               <th className="px-4 py-3 text-center hidden lg:table-cell">입자</th>
               <th className="px-4 py-3 text-center">재고</th>
@@ -356,7 +373,7 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
               processedColumns.map((col) => {
                 const isLowStock  = col.total_stock <= col.min_safety_stock;
                 const isOutOfStock = col.total_stock === 0;
-                const { length, inner } = parseSize(col.size);
+                const { inner, lengthKey } = parseSize(col.size, typeOf(col));
                 return (
                   <tr key={col.id} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-center">
@@ -408,7 +425,7 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
                     </td>
                     <td className="px-4 py-3 text-gray-600 font-mono text-xs">{col.cat_no}</td>
                     <td className="px-4 py-3 text-center text-gray-600 hidden md:table-cell">
-                      {length !== null ? length : '-'}
+                      {lengthKey ?? '-'}
                     </td>
                     <td className="px-4 py-3 text-center text-gray-600 hidden md:table-cell">
                       {inner !== null ? inner : '-'}
