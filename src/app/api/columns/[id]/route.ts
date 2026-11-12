@@ -14,10 +14,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       'model_name', 'cat_no', 'registration_date', 'size', 'particle_size',
       'total_stock', 'total_usage_count', 'min_safety_stock', 'unit_price',
       'kep_code', 'purchase_required', 'purchase_status', 'purchase_quantity',
-      'order_date', 'notes', 'products_used'
+      'order_date', 'notes', 'products_used', 'column_type'
     ];
     for (const key of allowedFields) {
       if (key in body) updateData[key] = body[key];
+    }
+    if ('column_type' in updateData && !['LC', 'GC'].includes(updateData.column_type)) {
+      return NextResponse.json({ error: '칼럼 종류는 LC 또는 GC만 가능합니다' }, { status: 400 });
     }
 
     const { data, error } = await sb

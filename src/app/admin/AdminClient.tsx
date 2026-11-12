@@ -129,6 +129,22 @@ export default function AdminClient({ adminName, username }: Props) {
     fetchData();
   };
 
+  const handleChangeType = async (col: ColumnModel, next: 'LC' | 'GC') => {
+    if (!confirm(`"${col.model_name} (${col.cat_no})"을(를) ${next} 칼럼으로 옮길까요?`)) return;
+    const res = await fetch(`/api/columns/${col.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ column_type: next }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setMessage({ type: 'error', text: err.error || '종류 변경 실패' });
+      return;
+    }
+    setColumns(prev => prev.map(c => (c.id === col.id ? { ...c, column_type: next } : c)));
+    setMessage({ type: 'success', text: `${col.model_name}을(를) ${next}로 옮겼습니다` });
+  };
+
   const handleColumnDelete = async (col: ColumnModel) => {
     if (!confirm(`"${col.model_name} (${col.cat_no})"을(를) 삭제하시겠습니까?`)) return;
     const res = await fetch(`/api/columns/${col.id}`, { method: 'DELETE' });
@@ -273,6 +289,7 @@ export default function AdminClient({ adminName, username }: Props) {
                   isAdmin
                   onEdit={setEditingColumn}
                   onDelete={handleColumnDelete}
+                  onChangeType={handleChangeType}
                   onRowClick={setDetailColumn}
                   mappingMap={mappingMap}
                 />
@@ -442,6 +459,7 @@ function ColumnEditDialog({ column, onClose, onSaved, onHidden }: {
   const [form, setForm] = useState({
     model_name: column.model_name,
     cat_no: column.cat_no,
+    column_type: (column.column_type || 'LC') as 'LC' | 'GC',
     size: column.size || '',
     particle_size: column.particle_size || 0,
     total_stock: column.total_stock,
@@ -486,6 +504,20 @@ function ColumnEditDialog({ column, onClose, onSaved, onHidden }: {
   return (
     <DialogShell title="칼럼 정보 수정" onClose={onClose}>
       <form onSubmit={handleSave} className="space-y-3">
+        <Field label="칼럼 종류">
+          <div className="flex gap-2">
+            {(['LC', 'GC'] as const).map(t => (
+              <button key={t} type="button" onClick={() => setForm({...form, column_type: t})}
+                className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium ${
+                  form.column_type === t
+                    ? (t === 'LC' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-emerald-600 border-emerald-600 text-white')
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}>
+                {t === 'LC' ? 'LC (액체)' : 'GC (기체)'}
+              </button>
+            ))}
+          </div>
+        </Field>
         <Field label="모델명">
           <input value={form.model_name} onChange={e => setForm({...form, model_name: e.target.value})}
             className="w-full px-3 py-2 border rounded-lg" required />
@@ -559,6 +591,7 @@ function ColumnAddDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (
   const [form, setForm] = useState({
     model_name: '',
     cat_no: '',
+    column_type: 'LC' as 'LC' | 'GC',
     size: '',
     particle_size: 5.0,
     total_stock: 0,
@@ -590,6 +623,20 @@ function ColumnAddDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (
   return (
     <DialogShell title="칼럼 추가" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
+        <Field label="칼럼 종류">
+          <div className="flex gap-2">
+            {(['LC', 'GC'] as const).map(t => (
+              <button key={t} type="button" onClick={() => setForm({...form, column_type: t})}
+                className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium ${
+                  form.column_type === t
+                    ? (t === 'LC' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-emerald-600 border-emerald-600 text-white')
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}>
+                {t === 'LC' ? 'LC (액체)' : 'GC (기체)'}
+              </button>
+            ))}
+          </div>
+        </Field>
         <Field label="모델명 *">
           <input value={form.model_name} onChange={e => setForm({...form, model_name: e.target.value})}
             className="w-full px-3 py-2 border rounded-lg" required placeholder="ZORBAX Eclipse C18" />

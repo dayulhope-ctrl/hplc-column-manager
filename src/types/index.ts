@@ -7,12 +7,14 @@ export type ColumnStatus = '사용 중' | '재고 대기' | '폐기 완료' | '�
 export type PurchaseStatus = '발주 완료' | '입고 완료' | '구매 승인';
 export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'ordered' | 'received';
 export type UrgencyLevel = 'low' | 'normal' | 'high' | 'urgent';
+export type ColumnType = 'LC' | 'GC';
 
 // 칼럼 모델
 export interface ColumnModel {
   id: string;
   model_name: string;
   cat_no: string;
+  column_type: ColumnType;
   registration_date: string | null;
   size: string | null;
   particle_size: number | null;

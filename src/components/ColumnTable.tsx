@@ -5,6 +5,9 @@ import { ColumnModel } from '@/types';
 import { ShoppingCart, Edit, Trash2, AlertCircle, ChevronDown, Check } from 'lucide-react';
 
 const LS_FILTER_KEY = 'hplc_column_filter';
+const LS_TYPE_KEY = 'hplc_column_type_tab';
+type TypeTab = 'all' | 'LC' | 'GC';
+const typeOf = (c: ColumnModel): 'LC' | 'GC' => (c.column_type === 'GC' ? 'GC' : 'LC');
 
 function parseSize(size: string | null | undefined): { length: number | null; inner: number | null } {
   if (!size) return { length: null, inner: null };
@@ -174,10 +177,32 @@ interface ColumnTableProps {
   onDelete?: (column: ColumnModel) => void;
   onRowClick?: (column: ColumnModel) => void;
   mappingMap?: Record<string, { product_name: string; test_item: string | null }[]>;
+  onChangeType?: (column: ColumnModel, next: 'LC' | 'GC') => void;
 }
 
 
-export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdit, onDelete, onRowClick, mappingMap }: ColumnTableProps) {
+export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPurchase, onEdit, onDelete, onRowClick, mappingMap, onChangeType }: ColumnTableProps) {
+  const [typeTab, setTypeTab] = useState<TypeTab>('all');
+  useEffect(() => {
+    try {
+      const t = localStorage.getItem(LS_TYPE_KEY);
+      if (t === 'LC' || t === 'GC' || t === 'all') setTypeTab(t);
+    } catch {}
+  }, []);
+  const changeTypeTab = (t: TypeTab) => {
+    setTypeTab(t);
+    try { localStorage.setItem(LS_TYPE_KEY, t); } catch {}
+  };
+  const typeCounts = useMemo(() => ({
+    all: allColumns.length,
+    LC: allColumns.filter(c => typeOf(c) === 'LC').length,
+    GC: allColumns.filter(c => typeOf(c) === 'GC').length,
+  }), [allColumns]);
+  // 이하 필터·표는 고른 종류(LC/GC) 안에서만 동작
+  const columns = useMemo(
+    () => (typeTab === 'all' ? allColumns : allColumns.filter(c => typeOf(c) === typeTab)),
+    [allColumns, typeTab]
+  );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
@@ -249,6 +274,21 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* 필터 바 */}
       <div className="px-4 py-2.5 border-b border-gray-100 flex flex-wrap gap-2 items-center bg-gray-50">
+        <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 mr-1">
+          {(['all', 'LC', 'GC'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => changeTypeTab(t)}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                typeTab === t
+                  ? (t === 'GC' ? 'bg-emerald-600 text-white' : t === 'LC' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-white')
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {t === 'all' ? '전체' : t} <span className="opacity-75">{typeCounts[t]}</span>
+            </button>
+          ))}
+        </div>
         <span className="text-xs font-medium text-gray-500">필터:</span>
 
         <MultiSelectFilter
@@ -292,6 +332,7 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
             <tr>
+              <th className="px-3 py-3 text-center">종류</th>
               <th className="px-4 py-3 text-left">모델명</th>
               <th className="px-4 py-3 text-left">Cat. No</th>
               <th className="px-4 py-3 text-center hidden md:table-cell">길이(MM)</th>
@@ -307,7 +348,7 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
           <tbody className="divide-y divide-gray-100">
             {processedColumns.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-gray-400">
+                <td colSpan={11} className="px-4 py-12 text-center text-gray-400">
                   데이터가 없습니다
                 </td>
               </tr>
@@ -318,6 +359,26 @@ export default function ColumnTable({ columns, isAdmin, onRequestPurchase, onEdi
                 const { length, inner } = parseSize(col.size);
                 return (
                   <tr key={col.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-3 text-center">
+                      {(() => {
+                        const t = typeOf(col);
+                        const cls = `inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${
+                          t === 'GC' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                        }`;
+                        const next = t === 'GC' ? 'LC' : 'GC';
+                        return isAdmin && onChangeType ? (
+                          <button
+                            onClick={() => onChangeType(col, next)}
+                            className={`${cls} hover:ring-2 hover:ring-offset-1 ${t === 'GC' ? 'hover:ring-emerald-300' : 'hover:ring-blue-300'}`}
+                            title={`눌러서 ${next}로 옮기기`}
+                          >
+                            {t} ⇄
+                          </button>
+                        ) : (
+                          <span className={cls}>{t}</span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
                       <div className="flex items-center gap-2">
                         {isOutOfStock && <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500" />}

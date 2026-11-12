@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       .insert({
         model_name: body.model_name,
         cat_no: body.cat_no,
+        column_type: body.column_type === 'GC' ? 'GC' : 'LC',
         registration_date: body.registration_date || null,
         size: body.size || null,
         particle_size: body.particle_size || null,

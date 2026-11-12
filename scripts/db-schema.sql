@@ -223,3 +223,27 @@ CREATE TRIGGER update_individual_columns_updated_at BEFORE UPDATE ON individual_
 DROP TRIGGER IF EXISTS update_purchase_requests_updated_at ON purchase_requests;
 CREATE TRIGGER update_purchase_requests_updated_at BEFORE UPDATE ON purchase_requests
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+-- 칼럼 종류 (LC / GC) — 2026-11-12 추가
+-- 처음 한 번만: 칸을 만들고 기존 칼럼을 사이즈로 자동 분류한다.
+--   GC: 길이가 m 단위(예: 30m, 30 m)이거나 첫 숫자(내경)가 1 미만(예: 0.25 x 30)
+--   나머지는 LC. 잘못 분류된 것은 관리자 화면에서 직접 옮긴다.
+--   자동 분류는 '수정일'을 바꾸지 않도록 수정시각 트리거를 잠시 끈다.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema() AND table_name = 'column_models' AND column_name = 'column_type'
+  ) THEN
+    ALTER TABLE column_models ADD COLUMN column_type text NOT NULL DEFAULT 'LC';
+    ALTER TABLE column_models ADD CONSTRAINT column_models_column_type_check CHECK (column_type IN ('LC', 'GC'));
+    ALTER TABLE column_models DISABLE TRIGGER update_column_models_updated_at;
+    UPDATE column_models SET column_type = 'GC'
+    WHERE size ~* '[0-9]\s*m([^m]|$)'
+       OR substring(size from '[0-9]+(?:\.[0-9]+)?')::numeric < 1;
+    ALTER TABLE column_models ENABLE TRIGGER update_column_models_updated_at;
+  END IF;
+END
+$$;
+CREATE INDEX IF NOT EXISTS idx_column_models_type ON column_models (column_type);
