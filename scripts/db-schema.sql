@@ -247,3 +247,51 @@ BEGIN
 END
 $$;
 CREATE INDEX IF NOT EXISTS idx_column_models_type ON column_models (column_type);
+
+-- 사이즈 표기 통일 — 2026-11-12, 사용자 확인 후 (한 번만 실행)
+--   GC: "내경mm x 길이m", LC: "내경mm × 길이mm"
+--   Cat. No 와 지금 사이즈가 둘 다 맞을 때만 바꾸고, 바꾼 내용은 활동 이력에 남긴다.
+DO $$
+DECLARE
+  r record;
+  n int := 0;
+BEGIN
+  IF EXISTS (SELECT 1 FROM _app_migrations WHERE key = 'size_cleanup_20261112') THEN
+    RETURN;
+  END IF;
+  FOR r IN
+    SELECT c.id, c.size AS before, v.after
+    FROM column_models c
+    JOIN (VALUES
+      ('123-1032',       '0.32 x 30',      '0.32mm x 30m'),
+      ('123-1033',       '0.32 x 30',      '0.32mm x 30m'),
+      ('123-1064',       '0.32 x 60',      '0.32mm x 60m'),
+      ('125-1035',       '0.53 x 30',      '0.53mm x 30m'),
+      ('122-5012',       '0.25 x 15',      '0.25mm x 15m'),
+      ('123-1364',       '0.32 x 60',      '0.32mm x 60m'),
+      ('122-0733',       '0.25 x 30',      '0.25mm x 30m'),
+      ('19091J-413',     '0.32 x 30',      '0.32mm x 30m'),
+      ('19091J-413-KEY', '0.32 x 30',      '0.32mm x 30m'),
+      ('19095J-623',     '0.53 x 30',      '0.53mm x 30m'),
+      ('CP7352',         '0.32 x 50',      '0.32mm x 50m'),
+      ('26085-3960',     '0.53 x 30',      '0.53mm x 30m'),
+      ('7KM-G005-31',    '0.32 x 60',      '0.32mm x 60m'),
+      ('WAT046980',      '3.9x150',        '3.9mm × 150mm'),
+      ('CP9107',         '60m x 0.53 mm',  '0.53mm x 60m'),
+      ('122-1334',       '30m X 0.25 mm',  '0.25mm x 30m'),
+      ('CP7412',         '30m X 0.25mm',   '0.25mm x 30m'),
+      ('123-0733',       '30m x 0.32mm',   '0.32mm x 30m'),
+      ('00F-4336-E0',    '150 x 4.6 mm',   '4.6mm × 150mm')
+    ) AS v(cat_no, before, after)
+      ON c.cat_no = v.cat_no AND c.size = v.before
+  LOOP
+    UPDATE column_models SET size = r.after WHERE id = r.id;
+    INSERT INTO activity_logs (actor, actor_type, action, target_type, target_id, details)
+    VALUES ('system', 'system', 'update_column', 'column_model', r.id,
+            jsonb_build_object('size', r.after, 'before', r.before, 'reason', '사이즈 표기 통일'));
+    n := n + 1;
+  END LOOP;
+  INSERT INTO _app_migrations (key, value, at) VALUES ('size_cleanup_20261112', n::text, now());
+  RAISE NOTICE '사이즈 표기 통일: %개 수정', n;
+END
+$$;
