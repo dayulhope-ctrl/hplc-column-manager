@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         size: body.size || null,
         particle_size: body.particle_size || null,
         total_stock: body.total_stock || 0,
-        min_safety_stock: body.min_safety_stock || 2,
+        min_safety_stock: body.min_safety_stock ?? 2,
         unit_price: body.unit_price || 0,
         kep_code: body.kep_code || null,
         notes: body.notes || null,

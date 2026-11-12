@@ -512,8 +512,8 @@ function ColumnEditDialog({ column, onClose, onSaved, onHidden }: {
               className="w-full px-3 py-2 border rounded-lg" />
           </Field>
           <Field label="최소 안전재고">
-            <input type="number" value={form.min_safety_stock}
-              onChange={e => setForm({...form, min_safety_stock: parseInt(e.target.value) || 0})}
+            <input type="number" min={0} value={form.min_safety_stock}
+              onChange={e => setForm({...form, min_safety_stock: Math.max(0, parseInt(e.target.value) || 0)})}
               className="w-full px-3 py-2 border rounded-lg" />
           </Field>
         </div>
@@ -616,8 +616,8 @@ function ColumnAddDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (
               className="w-full px-3 py-2 border rounded-lg" />
           </Field>
           <Field label="최소 안전재고">
-            <input type="number" value={form.min_safety_stock}
-              onChange={e => setForm({...form, min_safety_stock: parseInt(e.target.value) || 2})}
+            <input type="number" min={0} value={form.min_safety_stock}
+              onChange={e => setForm({...form, min_safety_stock: Math.max(0, parseInt(e.target.value) || 0)})}
               className="w-full px-3 py-2 border rounded-lg" />
           </Field>
         </div>
