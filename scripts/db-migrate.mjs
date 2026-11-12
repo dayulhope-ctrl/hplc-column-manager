@@ -6,6 +6,7 @@
 // 안전장치: 앱이 실제로 쓰는 DB(DATABASE_URL)에 칼럼 데이터가 하나도 없으면
 // 빈 화면이 나가지 않도록 시작을 멈춘다 (실패하면 이전 배포가 그대로 운영된다).
 // 정말로 빈 DB 로 시작해야 할 때만 환경변수 ALLOW_EMPTY_DB=1 을 넣는다.
+// 단, 스테이징(검토용) 환경은 운영과 다른 빈 DB 를 쓰므로 비어 있어도 시작한다.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -55,7 +56,11 @@ async function main() {
   await app.connect();
   try {
     const models = await describe(app, '앱 연결');
-    if (!models && process.env.ALLOW_EMPTY_DB !== '1') {
+    const { rows } = await app.query('SELECT current_database() AS db');
+    const isStaging = /_staging$/.test(rows[0].db);
+    if (!models && isStaging) {
+      log('스테이징(검토용) DB 라 비어 있어도 시작함 — 운영 데이터와는 따로예요');
+    } else if (!models && process.env.ALLOW_EMPTY_DB !== '1') {
       throw new Error('앱이 연결한 DB 에 칼럼 데이터가 없습니다. 다른 DB 에 연결됐을 수 있어 시작을 멈춥니다.');
     }
   } finally {
