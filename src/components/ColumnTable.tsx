@@ -331,7 +331,6 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
           options={uniqueParticles}
           selected={filterParticles}
           onApply={setFilterParticles}
-          formatOption={v => `${v} µm`}
         />
 
         {hasFilter && (
@@ -358,7 +357,7 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
               <th className="px-4 py-3 text-left">Cat. No</th>
               <th className="px-4 py-3 text-center hidden md:table-cell">{lengthUnitHeader ? `길이(${lengthUnitHeader})` : '길이'}</th>
               <th className="px-4 py-3 text-center hidden md:table-cell">내경(MM)</th>
-              <th className="px-4 py-3 text-center hidden lg:table-cell">입자</th>
+              <th className="px-4 py-3 text-center hidden lg:table-cell normal-case">입자(µm)</th>
               <th className="px-4 py-3 text-center">재고</th>
               <th className="px-4 py-3 text-left hidden md:table-cell">KEP</th>
               <th className="px-4 py-3 text-right hidden lg:table-cell">단가</th>
@@ -435,7 +434,7 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
                       {inner !== null ? inner : '-'}
                     </td>
                     <td className="px-4 py-3 text-center text-gray-600 hidden lg:table-cell">
-                      {col.particle_size ? `${col.particle_size} µm` : '-'}
+                      {col.particle_size ? col.particle_size : '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-bold ${
