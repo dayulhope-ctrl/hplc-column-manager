@@ -216,6 +216,9 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
     GC: allColumns.filter(c => typeOf(c) === 'GC').length,
   }), [allColumns]);
   // 이하 필터·표는 고른 종류(LC/GC) 안에서만 동작
+  // LC 탭은 mm, GC 탭은 m 로 단위를 머리글에만 쓴다. 전체 탭은 단위가 섞이므로 값마다 단위를 붙인다.
+  const lengthUnitHeader = typeTab === 'LC' ? 'mm' : typeTab === 'GC' ? 'm' : null;
+  const showLength = (k: string) => (lengthUnitHeader ? k.split(' ')[0] : k);
   const columns = useMemo(
     () => (typeTab === 'all' ? allColumns : allColumns.filter(c => typeOf(c) === typeTab)),
     [allColumns, typeTab]
@@ -310,10 +313,11 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
         <span className="text-xs font-medium text-gray-500">필터:</span>
 
         <MultiSelectFilter
-          label="길이"
+          label={lengthUnitHeader ? `길이(${lengthUnitHeader})` : '길이'}
           options={uniqueLengths}
           selected={filterLengths}
           onApply={setFilterLengths}
+          formatOption={showLength}
         />
         <MultiSelectFilter
           label="내경(mm)"
@@ -352,7 +356,7 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
               <th className="px-3 py-3 text-center">종류</th>
               <th className="px-4 py-3 text-left">모델명</th>
               <th className="px-4 py-3 text-left">Cat. No</th>
-              <th className="px-4 py-3 text-center hidden md:table-cell">길이</th>
+              <th className="px-4 py-3 text-center hidden md:table-cell">{lengthUnitHeader ? `길이(${lengthUnitHeader})` : '길이'}</th>
               <th className="px-4 py-3 text-center hidden md:table-cell">내경(MM)</th>
               <th className="px-4 py-3 text-center hidden lg:table-cell">입자</th>
               <th className="px-4 py-3 text-center">재고</th>
@@ -425,7 +429,7 @@ export default function ColumnTable({ columns: allColumns, isAdmin, onRequestPur
                     </td>
                     <td className="px-4 py-3 text-gray-600 font-mono text-xs">{col.cat_no}</td>
                     <td className="px-4 py-3 text-center text-gray-600 hidden md:table-cell">
-                      {lengthKey ?? '-'}
+                      {lengthKey ? showLength(lengthKey) : '-'}
                     </td>
                     <td className="px-4 py-3 text-center text-gray-600 hidden md:table-cell">
                       {inner !== null ? inner : '-'}
